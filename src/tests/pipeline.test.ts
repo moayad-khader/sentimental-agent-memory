@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { DecayEngine } from "@/domain/decay.js";
-import type { SentimentEdge } from "@/schema/types/edges.types.js";
+import { DecayEngine } from "@/modules/memory/domain/decay";
+import type { SentimentEdge } from "@/modules/memory/domain/schema/types/edges.types";
 
 const engine = new DecayEngine();
 
@@ -61,7 +61,7 @@ describe("DecayEngine.computeUpdated", () => {
 
 describe("ExtractionResultSchema", () => {
   it("parses valid extraction output", async () => {
-    const { ExtractionResultSchema } = await import("@/schema/extraction.js");
+    const { ExtractionResultSchema } = await import("@/modules/memory/domain/schema/extraction");
     const valid = {
       entities: [{ name: "Vendor X", type: "Organization", aliases: [] }],
       facts: [{ subjectName: "user", relation: "worked_with", objectName: "Vendor X", confidence: 0.9 }],
@@ -79,7 +79,7 @@ describe("ExtractionResultSchema", () => {
   });
 
   it("rejects unknown emotion", async () => {
-    const { ExtractionResultSchema } = await import("@/schema/extraction.js");
+    const { ExtractionResultSchema } = await import("@/modules/memory/domain/schema/extraction");
     const invalid = {
       entities: [],
       facts: [],

@@ -57,31 +57,32 @@ Three types of memory are extracted from each conversation turn and stored as gr
 ## Architecture
 
 ```
-Conversation Turn
+POST /ingest
        │
        ▼
-  Extractor          calls Gemini 2.0 Flash with a structured JSON schema,
-                     returns entities, facts, preferences, and sentiments
+  IngestHandler      validates request body (userId, userName, conversationTurn)
        │
        ▼
-  Entity Resolver    compares extracted entity names against what already
-                     exists in Neo4j using Levenshtein similarity (≥ 0.85
-                     threshold). Matches reuse the existing node and merge
-                     aliases. New entities get a UUID.
+  MemoryService      orchestrates the full pipeline
        │
-       ▼
-  Graph Store        writes everything to Neo4j using MERGE so re-ingesting
-                     the same turn is safe. For sentiment edges, reads the
-                     existing edge first and applies decay before writing.
+       ├──▶ MemoryExtractor     calls Gemini 2.0 Flash with a structured JSON schema,
+       │                        returns entities, facts, preferences, and sentiments
        │
-       ▼
-  Decay Engine       runs at write time, not on a schedule. Decays the
-                     stored confidence based on time elapsed, then applies
-                     a reinforcement boost if the same sentiment is
-                     re-expressed. Edges below 0.15 are archived.
+       ├──▶ EntityRepository    resolves extracted entity names against Neo4j using
+       │    (resolve)           Levenshtein similarity (≥ 0.85). Matches reuse the
+       │                        existing node and merge aliases. New entities get a UUID.
        │
-       ▼
-  Neo4j              stores the final graph
+       ├──▶ EntityRepository    writes users, entities, facts, preferences, and
+       │    (upsert*)           sentiments to Neo4j via MERGE. For sentiment edges,
+       │                        reads the existing edge first and applies decay.
+       │
+       ├──▶ DecayEngine         runs at write time. Decays stored confidence by time
+       │                        elapsed, then applies a reinforcement boost if the same
+       │                        sentiment is re-expressed. Edges below 0.15 are archived.
+       │
+       └──▶ LogRepository       writes a full audit trail to PostgreSQL — one row per
+                                extraction, plus rows for every fact, preference, and
+                                sentiment that was written in this turn.
 ```
 
 ---
@@ -112,6 +113,25 @@ If the sentiment *direction changes* (e.g., the user now feels positive about so
 ### Archival
 
 Edges with confidence below 0.15 are marked `archived: true` rather than deleted. The history is preserved — the system knows the sentiment existed and faded — but archived edges signal that the feeling is no longer reliable.
+
+---
+
+## HTTP API
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/ingest` | Extract memory from a conversation turn and write to Neo4j + PostgreSQL |
+| `GET` | `/memory/:userId` | Read the live memory graph for a user from Neo4j |
+| `GET` | `/history/:userId` | Read the full audit log for a user from PostgreSQL |
+
+**POST /ingest**
+```json
+{
+  "userId": "user-abc-123",
+  "userName": "Alice",
+  "conversationTurn": "I was frustrated with Vendor X because they kept delaying our deliveries."
+}
+```
 
 ---
 
@@ -150,25 +170,134 @@ Uniqueness constraints are created automatically on startup for `User.id` and `E
 
 ---
 
+## ERD
+
+### PostgreSQL — audit log tables
+
+```mermaid
+erDiagram
+    smg_extraction_log {
+        varchar   extraction_log_id        PK
+        varchar   extraction_log_user_id
+        text      extraction_log_conversation
+        date      extraction_log_extracted_at
+        integer   extraction_log_entities_count
+        integer   extraction_log_facts_count
+        integer   extraction_log_preferences_count
+        integer   extraction_log_sentiments_count
+        jsonb     extraction_log_raw_json
+    }
+
+    smg_sentiment_log {
+        varchar   sentiment_log_id         PK
+        varchar   sentiment_log_user_id
+        varchar   sentiment_log_entity_id
+        varchar   sentiment_log_entity_name
+        varchar   sentiment_log_sentiment
+        varchar   sentiment_log_emotion
+        text      sentiment_log_reason
+        float     sentiment_log_confidence
+        date      sentiment_log_observed_at
+        boolean   sentiment_log_archived
+        timestamp sentiment_log_recorded_at
+    }
+
+    smg_fact_log {
+        varchar   fact_log_id              PK
+        varchar   fact_log_user_id
+        varchar   fact_log_entity_id
+        varchar   fact_log_entity_name
+        varchar   fact_log_relation
+        float     fact_log_confidence
+        date      fact_log_observed_at
+        timestamp fact_log_recorded_at
+    }
+
+    smg_preference_log {
+        varchar   preference_log_id        PK
+        varchar   preference_log_user_id
+        varchar   preference_log_entity_id
+        varchar   preference_log_entity_name
+        varchar   preference_log_polarity
+        text      preference_log_reason
+        float     preference_log_confidence
+        date      preference_log_observed_at
+        timestamp preference_log_recorded_at
+    }
+
+    smg_extraction_log ||--o{ smg_sentiment_log  : "user_id"
+    smg_extraction_log ||--o{ smg_fact_log        : "user_id"
+    smg_extraction_log ||--o{ smg_preference_log  : "user_id"
+```
+
+### Neo4j — live memory graph
+
+```mermaid
+graph LR
+    U(["👤 User\n─────────\nid\nname"])
+    E(["🏷️ Entity\n─────────\nid\nname\ntype\naliases"])
+
+    U -->|"FACT\nrelation · confidence · observedAt"| E
+    U -->|"PREFERS\npolarity · reason · confidence · observedAt"| E
+    U -->|"SENTIMENT\nsentiment · emotion · reason\nconfidence · observedAt\nhalfLifeDays · decayPolicy · archived"| E
+```
+
+---
+
 ## Project Structure
 
 ```
 src/
-├── models/
-│   ├── nodes.ts          UserNode, EntityNode — Zod schemas and TypeScript types
-│   └── edges.ts          FactEdge, PreferenceEdge, SentimentEdge — Zod schemas and types
+├── server.ts                          # entry point — wires infrastructure and starts Fastify
+│
+├── api/
+│   ├── server.ts                      # Fastify app builder
+│   ├── dtos/
+│   │   └── ingest.dto.ts              # Zod request schema + inferred type
+│   ├── handlers/
+│   │   ├── ingest.handler.ts          # parse → call service → reply
+│   │   ├── memory.handler.ts
+│   │   └── history.handler.ts
+│   └── routes/
+│       ├── ingest.routes.ts           # owns POST /ingest
+│       ├── memory.routes.ts           # owns GET /memory/:userId
+│       └── history.routes.ts          # owns GET /history/:userId
+│
+├── services/
+│   └── memory.service.ts              # orchestrates extract → resolve → store → log
+│
+├── repositories/
+│   ├── neo4j/
+│   │   ├── client.ts                  # Neo4j driver singleton + constraint init
+│   │   ├── entity.repository.ts       # entity resolution + graph writes
+│   │   └── memory.repository.ts       # graph reads
+│   └── postgres/
+│       ├── data-source.ts             # PostgresClient singleton (TypeORM DataSource)
+│       ├── column-types.ts            # shared ColumnOptions constants
+│       └── log.repository.ts          # audit log writes + history reads
+│
+├── entities/                          # TypeORM entities (schema source of truth)
+│   ├── extraction-log.entity.ts
+│   ├── sentiment-log.entity.ts
+│   ├── fact-log.entity.ts
+│   └── preference-log.entity.ts
+│
+├── domain/
+│   └── decay.ts                       # pure decay + reinforcement logic
+│
 ├── extraction/
-│   ├── schemas.ts        Zod schemas for the structured JSON Gemini returns
-│   └── extractor.ts      Gemini 2.0 Flash call with responseMimeType: application/json
-├── graph/
-│   ├── client.ts         Neo4j driver singleton, constraint initialisation
-│   ├── resolver.ts       Fuzzy entity deduplication against existing graph nodes
-│   └── store.ts          Cypher MERGE writes for users, entities, and all edge types
-├── decay/
-│   └── policy.ts         Decay computation and reinforcement logic
-├── pipeline.ts           Orchestrates the full extract → resolve → store flow
-└── tests/
-    └── pipeline.test.ts  Unit tests for decay, reinforcement, archival, schema validation
+│   ├── extractor.ts                   # Gemini call + Zod parse
+│   └── prompt.ts                      # system prompt
+│
+├── schema/                            # Zod schemas + inferred types
+│   ├── edges.ts
+│   ├── nodes.ts
+│   ├── extraction.ts
+│   └── types/
+│
+└── lib/
+    ├── constants.ts
+    └── env.ts
 ```
 
 ---
@@ -176,18 +305,24 @@ src/
 ## Setup
 
 **Prerequisites**
-- Node.js 18+
+- Node.js 22+
 - pnpm
-- A running Neo4j instance (local, Docker, or Neo4j Aura)
-- A Gemini API key
+- Neo4j instance (local, Docker, or Neo4j Aura)
+- PostgreSQL instance (local or Docker)
+- Gemini API key
 
-**Install dependencies**
+**Option A — Docker Compose (recommended)**
+
+Starts Neo4j and PostgreSQL automatically:
 ```bash
-pnpm install
+cp .env.example .env   # fill in GEMINI_API_KEY, NEO4J_PASSWORD, POSTGRES_PASSWORD
+docker compose up -d
 ```
 
-**Configure environment**
+**Option B — local services**
+
 ```bash
+pnpm install
 cp .env.example .env
 ```
 
@@ -195,42 +330,24 @@ Edit `.env`:
 ```
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
-NEO4J_PASSWORD=your_password_here
-GEMINI_API_KEY=your_gemini_api_key_here
+NEO4J_PASSWORD=your_password
+
+DATABASE_URL=postgresql://smg:your_postgres_password@localhost:5432/memory_graph
+POSTGRES_PASSWORD=your_postgres_password
+
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-flash-lite-latest
 ```
 
-**Run the demo**
+Then start the server:
 ```bash
 pnpm dev
 ```
-
-This runs `src/pipeline.ts`, which ingests the example conversation turn, extracts entities and sentiment via Gemini, resolves entities against the graph, applies decay, and writes everything to Neo4j.
 
 **Run tests**
 ```bash
 pnpm test
 ```
-
----
-
-## Using the Pipeline in Your Own Code
-
-```ts
-import { ingest } from "./src/pipeline.js";
-import { initConstraints, closeDriver } from "./src/graph/client.js";
-
-await initConstraints();
-
-await ingest({
-  userId:           "user-abc-123",
-  userName:         "Alice",
-  conversationTurn: "I was frustrated with Vendor X because they kept delaying our deliveries.",
-});
-
-await closeDriver();
-```
-
-Call `ingest` once per conversation turn. The same `userId` must be passed each time to accumulate memory for the same user. The pipeline is idempotent — re-ingesting the same text is safe.
 
 ---
 
@@ -253,7 +370,9 @@ Call `ingest` once per conversation turn. The same `userId` must be passed each 
 | Concern | Library |
 |---|---|
 | Language | TypeScript (ESM) |
+| HTTP server | Fastify |
 | Graph database | Neo4j via `neo4j-driver` |
+| Relational database | PostgreSQL via TypeORM |
 | LLM | Gemini 2.0 Flash via `@google/genai` |
 | Schema validation | Zod |
 | Fuzzy matching | `fastest-levenshtein` |
