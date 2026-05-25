@@ -248,56 +248,61 @@ graph LR
 
 ```
 src/
-├── server.ts                          # entry point — wires infrastructure and starts Fastify
+├── main.ts                            # entry point — bootstraps AppModule
+├── app.module.ts                      # root module: initialises Neo4j + Postgres, registers MemoryModule
 │
-├── api/
-│   ├── server.ts                      # Fastify app builder
-│   ├── dtos/
-│   │   └── ingest.dto.ts              # Zod request schema + inferred type
-│   ├── handlers/
-│   │   ├── ingest.handler.ts          # parse → call service → reply
-│   │   ├── memory.handler.ts
-│   │   └── history.handler.ts
-│   └── routes/
-│       ├── ingest.routes.ts           # owns POST /ingest
-│       ├── memory.routes.ts           # owns GET /memory/:userId
-│       └── history.routes.ts          # owns GET /history/:userId
+├── config/
+│   ├── env.ts                         # requireEnvString / requireEnvFloat / requireEnvInt helpers
+│   └── constants.ts                   # env-derived runtime constants (thresholds, model name)
 │
-├── services/
-│   └── memory.service.ts              # orchestrates extract → resolve → store → log
-│
-├── repositories/
+├── database/
 │   ├── neo4j/
-│   │   ├── client.ts                  # Neo4j driver singleton + constraint init
-│   │   ├── entity.repository.ts       # entity resolution + graph writes
-│   │   └── memory.repository.ts       # graph reads
+│   │   └── client.ts                  # Neo4j driver singleton + constraint init
 │   └── postgres/
 │       ├── data-source.ts             # PostgresClient singleton (TypeORM DataSource)
-│       ├── column-types.ts            # shared ColumnOptions constants
-│       └── log.repository.ts          # audit log writes + history reads
+│       └── column-types.ts            # shared ColumnOptions constants
 │
-├── entities/                          # TypeORM entities (schema source of truth)
-│   ├── extraction-log.entity.ts
-│   ├── sentiment-log.entity.ts
-│   ├── fact-log.entity.ts
-│   └── preference-log.entity.ts
-│
-├── domain/
-│   └── decay.ts                       # pure decay + reinforcement logic
-│
-├── extraction/
-│   ├── extractor.ts                   # Gemini call + Zod parse
-│   └── prompt.ts                      # system prompt
-│
-├── schema/                            # Zod schemas + inferred types
-│   ├── edges.ts
-│   ├── nodes.ts
-│   ├── extraction.ts
-│   └── types/
-│
-└── lib/
-    ├── constants.ts
-    └── env.ts
+└── modules/
+    └── memory/
+        ├── memory.module.ts           # wires all dependencies, registers controller routes
+        ├── memory.controller.ts       # Fastify route handlers (ingest, getMemory, getHistory)
+        ├── memory.service.ts          # orchestrates extract → resolve → store → log
+        │
+        ├── dtos/
+        │   ├── ingest.dto.ts          # Zod request schema + IngestRequest type
+        │   ├── memory.dto.ts          # MemoryResponseDto (sentiments, facts, preferences)
+        │   └── history.dto.ts         # HistoryResponseDto (audit log rows)
+        │
+        ├── domain/
+        │   ├── decay.ts               # pure decay + reinforcement logic
+        │   └── schema/
+        │       ├── nodes.ts           # Zod schemas for User and Entity nodes
+        │       ├── edges.ts           # Zod schemas for Fact, Preference, Sentiment edges
+        │       ├── extraction.ts      # Zod schema for LLM extraction output
+        │       └── types/             # TypeScript types inferred from the schemas above
+        │
+        ├── extraction/
+        │   ├── extractor.ts           # Gemini call + Zod parse
+        │   └── prompt.ts              # system prompt
+        │
+        └── infrastructure/
+            └── persistence/
+                ├── entity-repository.abstract.ts   # IEntityRepository interface
+                ├── memory-repository.abstract.ts   # IMemoryRepository interface
+                ├── log-repository.abstract.ts      # ILogRepository interface
+                │
+                ├── neo4j/
+                │   ├── entity.repository.ts        # entity resolution + graph writes
+                │   └── memory.repository.ts        # graph reads
+                │
+                └── relational/
+                    ├── entities/                   # TypeORM entities (schema source of truth)
+                    │   ├── extraction-log.entity.ts
+                    │   ├── sentiment-log.entity.ts
+                    │   ├── fact-log.entity.ts
+                    │   └── preference-log.entity.ts
+                    └── repositories/
+                        └── log.repository.ts       # audit log writes + history reads
 ```
 
 ---
