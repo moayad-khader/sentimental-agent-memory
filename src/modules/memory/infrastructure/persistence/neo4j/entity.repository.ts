@@ -1,5 +1,5 @@
-import { distance } from "fastest-levenshtein";
 import { randomUUID } from "crypto";
+import { similarity } from "@/common/utils/similarity";
 import { Neo4jClient } from "@/database/neo4j/client";
 import { DecayEngine } from "@/modules/memory/domain/decay";
 import type { IEntityRepository } from "@/modules/memory/infrastructure/persistence/entity-repository.abstract";
@@ -15,12 +15,6 @@ export class EntityRepository implements IEntityRepository {
   ) {}
 
   // ── entity resolution ────────────────────────────────────────────
-
-  private similarity(a: string, b: string): number {
-    const maxLen = Math.max(a.length, b.length);
-    if (maxLen === 0) return 1;
-    return 1 - distance(a.toLowerCase(), b.toLowerCase()) / maxLen;
-  }
 
   private async loadExisting(): Promise<EntityNode[]> {
     const session = this.neo4j.getSession();
@@ -43,9 +37,9 @@ export class EntityRepository implements IEntityRepository {
       let matched: EntityNode | undefined;
 
       for (const known of [...existing, ...resolved]) {
-        const nameSim = this.similarity(candidate.name, known.name);
+        const nameSim = similarity(candidate.name, known.name);
         const aliasSim = known.aliases.reduce(
-          (best, alias) => Math.max(best, this.similarity(candidate.name, alias)),
+          (best, alias) => Math.max(best, similarity(candidate.name, alias)),
           0
         );
         if (Math.max(nameSim, aliasSim) >= FUZZY_MATCH_THRESHOLD) {

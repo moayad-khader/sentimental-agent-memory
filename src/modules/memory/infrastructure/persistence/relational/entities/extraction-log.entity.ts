@@ -1,12 +1,12 @@
 import { Entity, PrimaryColumn, Column } from "typeorm";
-import { COL_TEXT, COL_DATE, COL_JSONB } from "@/database/postgres/column-types";
+import { COL_PK_UUID, COL_VARCHAR, COL_INT, COL_TEXT, COL_DATE, COL_JSONB } from "@/database/postgres/column-types";
 
 @Entity("smg_extraction_log")
 export class ExtractionLog {
-  @PrimaryColumn()
+  @PrimaryColumn(COL_PK_UUID)
   extraction_log_id!: string;
 
-  @Column()
+  @Column(COL_VARCHAR)
   extraction_log_user_id!: string;
 
   @Column(COL_TEXT)
@@ -15,16 +15,16 @@ export class ExtractionLog {
   @Column(COL_DATE)
   extraction_log_extracted_at!: string;
 
-  @Column()
+  @Column(COL_INT)
   extraction_log_entities_count!: number;
 
-  @Column()
+  @Column(COL_INT)
   extraction_log_facts_count!: number;
 
-  @Column()
+  @Column(COL_INT)
   extraction_log_preferences_count!: number;
 
-  @Column()
+  @Column(COL_INT)
   extraction_log_sentiments_count!: number;
 
   @Column(COL_JSONB)
