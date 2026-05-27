@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import { Neo4jClient } from "@/database/neo4j/client";
 import { PostgresClient } from "@/database/postgres/data-source";
 import { MemoryModule } from "@/modules/memory/memory.module";
+import { AgentModule } from "@/modules/agent/agent.module";
 
 export class AppModule {
   static async bootstrap(): Promise<void> {
@@ -11,7 +12,8 @@ export class AppModule {
     const app = Fastify({ logger: true });
 
     app.register(async (instance) => {
-      MemoryModule.register(instance);
+      const memoryService = MemoryModule.register(instance);
+      AgentModule.register(instance, memoryService);
     });
 
     const port = Number(process.env.PORT) || 3000;

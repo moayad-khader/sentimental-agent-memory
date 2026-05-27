@@ -14,7 +14,7 @@ import { MemoryController } from "@/modules/memory/memory.controller";
 import { LLM_VENDOR } from "@/config/constants";
 
 export class MemoryModule {
-  static register(app: FastifyInstance): void {
+  static register(app: FastifyInstance): MemoryService {
     const llm = new LLMVendorStrategy().resolve(LLM_VENDOR);
     const hebbian = new HebbianEngine();
     const ds = PostgresClient.getInstance().getDataSource();
@@ -33,5 +33,6 @@ export class MemoryModule {
     );
 
     new MemoryController(service).registerRoutes(app);
+    return service;
   }
 }

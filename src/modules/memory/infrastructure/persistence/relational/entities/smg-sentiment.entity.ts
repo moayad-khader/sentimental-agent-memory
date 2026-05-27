@@ -1,21 +1,17 @@
 import { Entity, PrimaryColumn, Column, Unique, Index, ManyToOne, JoinColumn } from "typeorm";
-import { SmgUser } from "./smg-user.entity";
 import { SmgMemoryEntity } from "./smg-entity.entity";
 
 @Entity("smg_sentiments")
 @Index(["entity_id"])
-@Index(["user_id", "archived"])
-@Unique(["user_id", "entity_id", "emotion"])
+@Index(["subject_id", "archived"])
+@Unique(["subject_id", "entity_id", "emotion"])
 export class SmgSentiment {
   @PrimaryColumn({ type: "uuid" })
   sentiment_id!: string;
 
+  // varchar — can be a userId (arbitrary string) or entityId (UUID)
   @Column({ type: "varchar" })
-  user_id!: string;
-
-  @ManyToOne(() => SmgUser, { onDelete: "CASCADE" })
-  @JoinColumn({ name: "user_id" })
-  user?: SmgUser;
+  subject_id!: string;
 
   @Column({ type: "uuid" })
   entity_id!: string;
