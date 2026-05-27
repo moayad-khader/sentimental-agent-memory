@@ -1,17 +1,20 @@
 import { randomUUID } from "crypto";
+import type { Transaction } from "neo4j-driver";
 import { similarity } from "@/common/utils/similarity";
 import { Neo4jClient } from "@/database/neo4j/client";
 import { DecayEngine } from "@/modules/memory/domain/decay";
+import { HebbianEngine } from "@/modules/memory/domain/hebbian";
 import type { IEntityRepository } from "@/modules/memory/infrastructure/persistence/entity-repository.abstract";
 import type { ExtractedEntity } from "@/modules/memory/domain/schema/types/extraction.types";
-import type { UserNode, EntityNode } from "@/modules/memory/domain/schema/types/nodes.types";
+import type { UserNode, EntityNode, EpisodeNode } from "@/modules/memory/domain/schema/types/nodes.types";
 import type { FactEdge, PreferenceEdge, SentimentEdge } from "@/modules/memory/domain/schema/types/edges.types";
 import { FUZZY_MATCH_THRESHOLD } from "@/config/constants";
 
 export class EntityRepository implements IEntityRepository {
   constructor(
     private neo4j: Neo4jClient,
-    private decay: DecayEngine
+    private decay: DecayEngine,
+    private hebbian: HebbianEngine
   ) {}
 
   // ── entity resolution ────────────────────────────────────────────
@@ -128,38 +131,94 @@ export class EntityRepository implements IEntityRepository {
     const session = this.neo4j.getSession();
     try {
       for (const incoming of sentiments) {
-        const existing = await this.getExistingSentiment(incoming.subjectId, incoming.objectId, session);
-        const final = existing
-          ? this.decay.computeUpdated(existing, incoming, now)
-          : this.decay.computeNew(incoming);
+        const tx = session.beginTransaction();
+        try {
+          const existing = await this.getExistingSentiment(incoming.subjectId, incoming.objectId, incoming.emotion, tx);
+          const final = existing
+            ? this.decay.computeUpdated(existing, incoming, now)
+            : this.decay.computeNew(incoming);
 
-        await session.run(
-          `MATCH (s { id: $subjectId }), (o { id: $objectId })
-           MERGE (s)-[r:SENTIMENT]->(o)
-           SET r.sentiment = $sentiment, r.emotion = $emotion, r.reason = $reason,
-               r.confidence = $confidence, r.observedAt = $observedAt,
-               r.halfLifeDays = $halfLifeDays, r.decayPolicy = $decayPolicy, r.archived = $archived`,
-          {
-            subjectId: final.subjectId, objectId: final.objectId,
-            sentiment: final.sentiment, emotion: final.emotion, reason: final.reason,
-            confidence: final.confidence, observedAt: final.observedAt,
-            halfLifeDays: final.halfLifeDays, decayPolicy: final.decayPolicy, archived: final.archived,
-          }
-        );
+          await tx.run(
+            `MATCH (s { id: $subjectId }), (o { id: $objectId })
+             MERGE (s)-[r:SENTIMENT { emotion: $emotion }]->(o)
+             SET r.sentiment = $sentiment, r.reason = $reason,
+                 r.confidence = $confidence, r.observedAt = $observedAt,
+                 r.halfLifeDays = $halfLifeDays, r.decayPolicy = $decayPolicy, r.archived = $archived`,
+            {
+              subjectId: final.subjectId, objectId: final.objectId,
+              sentiment: final.sentiment, emotion: final.emotion, reason: final.reason,
+              confidence: final.confidence, observedAt: final.observedAt,
+              halfLifeDays: final.halfLifeDays, decayPolicy: final.decayPolicy, archived: final.archived,
+            }
+          );
+          await tx.commit();
+        } catch (e) {
+          await tx.rollback();
+          throw e;
+        }
       }
     } finally {
       await session.close();
     }
   }
 
+  async upsertEpisode(episode: EpisodeNode, entityIds: string[]): Promise<void> {
+    const session = this.neo4j.getSession();
+    const tx = session.beginTransaction();
+    try {
+      await tx.run(
+        `MERGE (ep:Episode { id: $id })
+         SET ep.userId = $userId, ep.timestamp = $timestamp, ep.source = $source`,
+        { id: episode.id, userId: episode.userId, timestamp: episode.timestamp, source: episode.source }
+      );
+      if (entityIds.length > 0) {
+        await tx.run(
+          `MATCH (ep:Episode { id: $episodeId })
+           UNWIND $entityIds AS entityId
+           MATCH (e:Entity { id: entityId })
+           MERGE (ep)-[:CONTAINS]->(e)`,
+          { episodeId: episode.id, entityIds }
+        );
+      }
+      await tx.commit();
+    } catch (e) {
+      await tx.rollback();
+      throw e;
+    } finally {
+      await session.close();
+    }
+  }
+
+  async upsertCoOccurrences(entityIds: string[], now: string): Promise<void> {
+    if (entityIds.length < 2) return;
+    const pairs = this.hebbian.pairs(entityIds);
+    const session = this.neo4j.getSession();
+    try {
+      await session.run(
+        `UNWIND $pairs AS pair
+         MATCH (a:Entity { id: pair[0] }), (b:Entity { id: pair[1] })
+         MERGE (a)-[r:CO_OCCURS]->(b)
+         ON CREATE SET r.weight = $delta, r.observedCount = 1, r.lastSeen = $now
+         ON MATCH SET r.weight = CASE WHEN r.weight + $delta > 1.0 THEN 1.0 ELSE r.weight + $delta END,
+                      r.observedCount = r.observedCount + 1, r.lastSeen = $now`,
+        { pairs, delta: this.hebbian.delta, now }
+      );
+    } finally {
+      await session.close();
+    }
+  }
+
+  // ── private helpers ───────────────────────────────────────────────
+
   private async getExistingSentiment(
     subjectId: string,
     objectId: string,
-    session: ReturnType<Neo4jClient["getSession"]>
+    emotion: string,
+    tx: Transaction
   ): Promise<SentimentEdge | null> {
-    const result = await session.run(
-      `MATCH (s { id: $subjectId })-[r:SENTIMENT]->(o { id: $objectId }) RETURN r`,
-      { subjectId, objectId }
+    const result = await tx.run(
+      `MATCH (s { id: $subjectId })-[r:SENTIMENT { emotion: $emotion }]->(o { id: $objectId }) RETURN r`,
+      { subjectId, objectId, emotion }
     );
     if (result.records.length === 0) return null;
     const r = result.records[0].get("r").properties;

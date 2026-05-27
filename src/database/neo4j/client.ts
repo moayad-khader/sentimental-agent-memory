@@ -32,6 +32,9 @@ export class Neo4jClient {
       await session.run(
         "CREATE CONSTRAINT entity_id IF NOT EXISTS FOR (e:Entity) REQUIRE e.id IS UNIQUE"
       );
+      await session.run(
+        "CREATE CONSTRAINT episode_id IF NOT EXISTS FOR (ep:Episode) REQUIRE ep.id IS UNIQUE"
+      );
     } finally {
       await session.close();
     }

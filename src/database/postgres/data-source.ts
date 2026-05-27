@@ -1,9 +1,14 @@
 import { DataSource } from "typeorm";
 import { requireEnvString } from "@/config/env";
 import { ExtractionLog } from "@/modules/memory/infrastructure/persistence/relational/entities/extraction-log.entity";
-import { SentimentLog } from "@/modules/memory/infrastructure/persistence/relational/entities/sentiment-log.entity";
-import { FactLog } from "@/modules/memory/infrastructure/persistence/relational/entities/fact-log.entity";
-import { PreferenceLog } from "@/modules/memory/infrastructure/persistence/relational/entities/preference-log.entity";
+import { SmgUser } from "@/modules/memory/infrastructure/persistence/relational/entities/smg-user.entity";
+import { SmgMemoryEntity } from "@/modules/memory/infrastructure/persistence/relational/entities/smg-entity.entity";
+import { SmgSentiment } from "@/modules/memory/infrastructure/persistence/relational/entities/smg-sentiment.entity";
+import { SmgFact } from "@/modules/memory/infrastructure/persistence/relational/entities/smg-fact.entity";
+import { SmgPreference } from "@/modules/memory/infrastructure/persistence/relational/entities/smg-preference.entity";
+import { SmgEpisode } from "@/modules/memory/infrastructure/persistence/relational/entities/smg-episode.entity";
+import { SmgEpisodeEntity } from "@/modules/memory/infrastructure/persistence/relational/entities/smg-episode-entity.entity";
+import { SmgCoOccurrence } from "@/modules/memory/infrastructure/persistence/relational/entities/smg-co-occurrence.entity";
 
 export class PostgresClient {
   private static instance: PostgresClient | null = null;
@@ -15,7 +20,11 @@ export class PostgresClient {
       url: requireEnvString("DATABASE_URL"),
       synchronize: true,
       logging: false,
-      entities: [ExtractionLog, SentimentLog, FactLog, PreferenceLog],
+      entities: [
+        ExtractionLog,
+        SmgUser, SmgMemoryEntity, SmgSentiment, SmgFact,
+        SmgPreference, SmgEpisode, SmgEpisodeEntity, SmgCoOccurrence,
+      ],
     });
   }
 

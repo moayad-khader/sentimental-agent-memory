@@ -1,4 +1,6 @@
+import { randomUUID } from "crypto";
 import { DEFAULT_HALF_LIFE_DAYS } from "@/config/constants";
+import { applySalience } from "@/modules/memory/domain/salience";
 import type { ExtractionResult } from "@/modules/memory/domain/schema/types/extraction.types";
 import type { EntityNode } from "@/modules/memory/domain/schema/types/nodes.types";
 import type { FactEdge, PreferenceEdge, SentimentEdge } from "@/modules/memory/domain/schema/types/edges.types";
@@ -6,6 +8,7 @@ import type { MemoryExtractor } from "@/modules/memory/extraction/extractor";
 import type { IEntityRepository } from "@/modules/memory/infrastructure/persistence/entity-repository.abstract";
 import type { IMemoryRepository } from "@/modules/memory/infrastructure/persistence/memory-repository.abstract";
 import type { ILogRepository } from "@/modules/memory/infrastructure/persistence/log-repository.abstract";
+import type { IStoreRepository } from "@/modules/memory/infrastructure/persistence/store-repository.abstract";
 import type { IngestRequest } from "@/modules/memory/dtos/ingest.dto";
 import type { MemoryResponseDto } from "@/modules/memory/dtos/memory.dto";
 import type { HistoryResponseDto } from "@/modules/memory/dtos/history.dto";
@@ -15,30 +18,47 @@ export class MemoryService {
     private readonly extractor: MemoryExtractor,
     private readonly entityRepository: IEntityRepository,
     private readonly memoryRepository: IMemoryRepository,
-    private readonly logRepository: ILogRepository
+    private readonly logRepository: ILogRepository,
+    private readonly storeRepository: IStoreRepository
   ) {}
 
   async ingest(options: IngestRequest): Promise<ExtractionResult> {
-    const { userId, userName, conversationTurn } = options;
-    const now = new Date().toISOString().split("T")[0];
+    const { userId, userName, conversationTurn, source } = options;
+    const date = new Date();
+    const now = date.toISOString().split("T")[0];
+    const timestamp = date.toISOString();
 
-    await this.entityRepository.upsertUser({ id: userId, name: userName });
+    const userNode = { id: userId, name: userName };
+    await Promise.all([
+      this.entityRepository.upsertUser(userNode),
+      this.storeRepository.upsertUser(userNode),
+    ]);
 
     const extraction = await this.extractor.extract(conversationTurn);
     const resolved = await this.entityRepository.resolve(extraction.entities);
 
-    await this.entityRepository.upsertEntities(resolved);
+    await Promise.all([
+      this.entityRepository.upsertEntities(resolved),
+      this.storeRepository.upsertEntities(resolved),
+    ]);
 
     const { facts, preferences, sentiments } = this.buildEdges(extraction, resolved, userId, now);
+    const episodeId = randomUUID();
+    const episodeNode = { id: episodeId, userId, timestamp, source };
+    const entityIds = resolved.map((e) => e.id);
 
     await Promise.all([
       this.entityRepository.upsertFacts(facts),
       this.entityRepository.upsertPreferences(preferences),
       this.entityRepository.upsertSentiments(sentiments, now),
-      this.logRepository.recordExtraction(userId, conversationTurn, extraction, now),
-      this.logRepository.recordFacts(userId, facts, resolved, now),
-      this.logRepository.recordPreferences(userId, preferences, resolved, now),
-      this.logRepository.recordSentiments(userId, sentiments, resolved, now),
+      this.entityRepository.upsertEpisode(episodeNode, entityIds),
+      this.entityRepository.upsertCoOccurrences(entityIds, now),
+      this.storeRepository.upsertFacts(facts),
+      this.storeRepository.upsertPreferences(preferences),
+      this.storeRepository.upsertSentiments(sentiments),
+      this.storeRepository.upsertEpisode(episodeNode, entityIds),
+      this.storeRepository.upsertCoOccurrences(entityIds, now),
+      this.logRepository.recordExtraction(userId, conversationTurn, extraction, timestamp),
     ]);
 
     return extraction;
@@ -87,7 +107,8 @@ export class MemoryService {
       return [{
         subjectId, objectId,
         sentiment: s.sentiment, emotion: s.emotion, reason: s.reason,
-        confidence: s.confidence, observedAt: now,
+        confidence: applySalience(s.emotion, s.confidence),
+        observedAt: now,
         halfLifeDays: DEFAULT_HALF_LIFE_DAYS,
         decayPolicy: "exponential" as const,
         archived: false,

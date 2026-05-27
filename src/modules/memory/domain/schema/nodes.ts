@@ -19,3 +19,10 @@ export const EntityNodeSchema = z.object({
   type: EntityTypeSchema,
   aliases: z.array(z.string()).default([]),
 });
+
+export const EpisodeNodeSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  timestamp: z.string(),
+  source: z.string(),
+});
