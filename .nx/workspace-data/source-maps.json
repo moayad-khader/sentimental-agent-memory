@@ -1,0 +1,240 @@
+{
+  "apps/api": {
+    "root": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "name": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "$schema": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "projectType": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "sourceRoot": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "targets": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.serve": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.serve.executor": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.serve.options": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.serve.options.command": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.executor": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options.command": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.options": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.executor": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.options.cwd": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.test.options.command": [
+      "apps/api/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.dependsOn": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.build.parallelism": [
+      "nx.json",
+      "nx/target-defaults"
+    ]
+  },
+  "apps/web": {
+    "root": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "name": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "$schema": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "projectType": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "sourceRoot": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.dev": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.dev.options": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.dev.executor": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.dev.options.cwd": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.dev.options.command": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.executor": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options.cwd": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options.command": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.start": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.start.options": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.start.executor": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.start.options.cwd": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.start.options.command": [
+      "apps/web/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.dev.dependsOn": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.dev.parallelism": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.build.dependsOn": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.build.parallelism": [
+      "nx.json",
+      "nx/target-defaults"
+    ]
+  },
+  "libs/shared": {
+    "root": [
+      "libs/shared/project.json",
+      "nx/core/project-json"
+    ],
+    "name": [
+      "libs/shared/project.json",
+      "nx/core/project-json"
+    ],
+    "$schema": [
+      "libs/shared/project.json",
+      "nx/core/project-json"
+    ],
+    "projectType": [
+      "libs/shared/project.json",
+      "nx/core/project-json"
+    ],
+    "sourceRoot": [
+      "libs/shared/project.json",
+      "nx/core/project-json"
+    ],
+    "targets": [
+      "libs/shared/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build": [
+      "libs/shared/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.executor": [
+      "libs/shared/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options": [
+      "libs/shared/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.options.command": [
+      "libs/shared/project.json",
+      "nx/core/project-json"
+    ],
+    "targets.build.dependsOn": [
+      "nx.json",
+      "nx/target-defaults"
+    ],
+    "targets.build.parallelism": [
+      "nx.json",
+      "nx/target-defaults"
+    ]
+  }
+}

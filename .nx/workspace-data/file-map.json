@@ -1,0 +1,485 @@
+{
+  "version": "6.0",
+  "nxVersion": "20.8.4",
+  "pathMappings": {
+    "@smg/shared": [
+      "libs/shared/src/index.ts"
+    ]
+  },
+  "nxJsonPlugins": [],
+  "fileMap": {
+    "nonProjectFiles": [
+      {
+        "file": "nx.json",
+        "hash": "6664686593417644017"
+      },
+      {
+        "file": ".gitignore",
+        "hash": "15373587898510196008"
+      },
+      {
+        "file": ".claude/settings.local.json",
+        "hash": "3354342830000155493"
+      },
+      {
+        "file": "Dockerfile",
+        "hash": "15072586746091160857"
+      },
+      {
+        "file": "agent.html",
+        "hash": "1379617630190234594"
+      },
+      {
+        "file": "tsconfig.base.json",
+        "hash": "14729843082874837677"
+      },
+      {
+        "file": "docker-compose.yml",
+        "hash": "4746690425683805696"
+      },
+      {
+        "file": "vitest.config.ts",
+        "hash": "12089512466532714997"
+      },
+      {
+        "file": ".env.example",
+        "hash": "1250934441264953273"
+      },
+      {
+        "file": "README.md",
+        "hash": "1258742794697652996"
+      },
+      {
+        "file": ".dockerignore",
+        "hash": "15373587898510196008"
+      },
+      {
+        "file": "package.json",
+        "hash": "15645259074391163926"
+      },
+      {
+        "file": "tsconfig.json",
+        "hash": "16625011515466790183"
+      },
+      {
+        "file": "pnpm-lock.yaml",
+        "hash": "11181199600867193986"
+      }
+    ],
+    "projectFileMap": {
+      "shared": [
+        {
+          "file": "libs/shared/project.json",
+          "hash": "4373667279828205895"
+        },
+        {
+          "file": "libs/shared/src/index.ts",
+          "hash": "17796429597341934926"
+        },
+        {
+          "file": "libs/shared/tsconfig.json",
+          "hash": "5348946864380607951"
+        }
+      ],
+      "api": [
+        {
+          "file": "apps/api/project.json",
+          "hash": "8929169186446815235"
+        },
+        {
+          "file": "apps/api/src/app.module.ts",
+          "hash": "9826855442948776244",
+          "deps": [
+            "npm:fastify"
+          ]
+        },
+        {
+          "file": "apps/api/src/common/types/deep-partial.type.ts",
+          "hash": "8648573461743412290"
+        },
+        {
+          "file": "apps/api/src/common/types/entity-condition.type.ts",
+          "hash": "8111459681226505591"
+        },
+        {
+          "file": "apps/api/src/common/types/infinity-pagination-result.type.ts",
+          "hash": "10986737922734723444"
+        },
+        {
+          "file": "apps/api/src/common/types/maybe.type.ts",
+          "hash": "2908075308407720479"
+        },
+        {
+          "file": "apps/api/src/common/types/nullable.type.ts",
+          "hash": "16130270633522378077"
+        },
+        {
+          "file": "apps/api/src/common/types/or-never.type.ts",
+          "hash": "67499346864195185"
+        },
+        {
+          "file": "apps/api/src/common/types/pagination-options.ts",
+          "hash": "13465597306043871696"
+        },
+        {
+          "file": "apps/api/src/common/utils/similarity.ts",
+          "hash": "392636463614660454",
+          "deps": [
+            "npm:fastest-levenshtein"
+          ]
+        },
+        {
+          "file": "apps/api/src/config/constants.ts",
+          "hash": "15006777945099147184",
+          "deps": [
+            "npm:dotenv"
+          ]
+        },
+        {
+          "file": "apps/api/src/config/env.ts",
+          "hash": "16359946369295916196"
+        },
+        {
+          "file": "apps/api/src/database/neo4j/client.ts",
+          "hash": "5050615982376521360",
+          "deps": [
+            "npm:neo4j-driver"
+          ]
+        },
+        {
+          "file": "apps/api/src/database/postgres/column-types.ts",
+          "hash": "8396601134405215128",
+          "deps": [
+            "npm:typeorm"
+          ]
+        },
+        {
+          "file": "apps/api/src/database/postgres/data-source.ts",
+          "hash": "8257926249222436812",
+          "deps": [
+            "npm:typeorm"
+          ]
+        },
+        {
+          "file": "apps/api/src/llm/strategy.ts",
+          "hash": "16127435690855161165"
+        },
+        {
+          "file": "apps/api/src/llm/types.ts",
+          "hash": "11229000647399573662"
+        },
+        {
+          "file": "apps/api/src/llm/vendors/gemini/adapter.ts",
+          "hash": "9935984365472440239",
+          "deps": [
+            "npm:@google/genai"
+          ]
+        },
+        {
+          "file": "apps/api/src/llm/vendors/gemini/factory.ts",
+          "hash": "9518629627907861346"
+        },
+        {
+          "file": "apps/api/src/main.ts",
+          "hash": "17303259889006556029",
+          "deps": [
+            "npm:reflect-metadata",
+            "npm:dotenv"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/agent/agent.controller.ts",
+          "hash": "10433259266547327320",
+          "deps": [
+            "npm:fastify"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/agent/agent.module.ts",
+          "hash": "13198902052938667424",
+          "deps": [
+            "npm:fastify"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/agent/agent.service.ts",
+          "hash": "6199645405156293664"
+        },
+        {
+          "file": "apps/api/src/modules/agent/dtos/chat.dto.ts",
+          "hash": "16276276457500346467",
+          "deps": [
+            "npm:zod"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/domain/decay.ts",
+          "hash": "949517466310884624"
+        },
+        {
+          "file": "apps/api/src/modules/memory/domain/hebbian.ts",
+          "hash": "2842551497230447756"
+        },
+        {
+          "file": "apps/api/src/modules/memory/domain/salience.ts",
+          "hash": "9300578438722528558"
+        },
+        {
+          "file": "apps/api/src/modules/memory/domain/schema/edges.ts",
+          "hash": "2375623222367201668",
+          "deps": [
+            "npm:zod"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/domain/schema/extraction.ts",
+          "hash": "6825170375856780489",
+          "deps": [
+            "npm:zod"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/domain/schema/nodes.ts",
+          "hash": "8187802052671210346",
+          "deps": [
+            "npm:zod"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/domain/schema/types/edges.types.ts",
+          "hash": "13851462312210002044",
+          "deps": [
+            "npm:zod"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/domain/schema/types/extraction.types.ts",
+          "hash": "5314805924729989217",
+          "deps": [
+            "npm:zod"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/domain/schema/types/nodes.types.ts",
+          "hash": "1931816037426214647",
+          "deps": [
+            "npm:zod"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/dtos/history.dto.ts",
+          "hash": "3449105755045643211"
+        },
+        {
+          "file": "apps/api/src/modules/memory/dtos/ingest.dto.ts",
+          "hash": "8263324569684960008",
+          "deps": [
+            "npm:zod"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/dtos/memory.dto.ts",
+          "hash": "9977691552214517605"
+        },
+        {
+          "file": "apps/api/src/modules/memory/extraction/extractor.ts",
+          "hash": "14680487373399233661"
+        },
+        {
+          "file": "apps/api/src/modules/memory/extraction/prompt.ts",
+          "hash": "16348734702516245161"
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/entity-repository.abstract.ts",
+          "hash": "2597818126368565572"
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/log-repository.abstract.ts",
+          "hash": "17580906850197467091"
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/memory-repository.abstract.ts",
+          "hash": "18311245836779049314"
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/neo4j/entity.repository.ts",
+          "hash": "7207612077210028501",
+          "deps": [
+            "npm:neo4j-driver"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/neo4j/memory.repository.ts",
+          "hash": "9750197640387508603",
+          "deps": [
+            "npm:neo4j-driver"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/relational/entities/extraction-log.entity.ts",
+          "hash": "12719033190224477502",
+          "deps": [
+            "npm:typeorm"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/relational/entities/smg-co-occurrence.entity.ts",
+          "hash": "5174497931426275676",
+          "deps": [
+            "npm:typeorm"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/relational/entities/smg-entity-type.entity.ts",
+          "hash": "6431110144551175502",
+          "deps": [
+            "npm:typeorm"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/relational/entities/smg-entity.entity.ts",
+          "hash": "819870440741885728",
+          "deps": [
+            "npm:typeorm"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/relational/entities/smg-episode-entity.entity.ts",
+          "hash": "14580076529357738770",
+          "deps": [
+            "npm:typeorm"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/relational/entities/smg-episode.entity.ts",
+          "hash": "273163143960924783",
+          "deps": [
+            "npm:typeorm"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/relational/entities/smg-fact.entity.ts",
+          "hash": "1053709553735418757",
+          "deps": [
+            "npm:typeorm"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/relational/entities/smg-preference.entity.ts",
+          "hash": "9607651658842845446",
+          "deps": [
+            "npm:typeorm"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/relational/entities/smg-sentiment.entity.ts",
+          "hash": "11554050254416941805",
+          "deps": [
+            "npm:typeorm"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/relational/entities/smg-user.entity.ts",
+          "hash": "4774246456290366051",
+          "deps": [
+            "npm:typeorm"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/relational/repositories/log.repository.ts",
+          "hash": "7955123487122087846",
+          "deps": [
+            "npm:typeorm"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/relational/repositories/store.repository.ts",
+          "hash": "3722567795732429685",
+          "deps": [
+            "npm:typeorm"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/infrastructure/persistence/store-repository.abstract.ts",
+          "hash": "4710313655056430962"
+        },
+        {
+          "file": "apps/api/src/modules/memory/memory.controller.ts",
+          "hash": "2104004349656750077",
+          "deps": [
+            "npm:fastify"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/memory.module.ts",
+          "hash": "982310392366694568",
+          "deps": [
+            "npm:fastify"
+          ]
+        },
+        {
+          "file": "apps/api/src/modules/memory/memory.service.ts",
+          "hash": "12328539794784465945"
+        },
+        {
+          "file": "apps/api/src/tests/pipeline.test.ts",
+          "hash": "8493544579600692021",
+          "deps": [
+            "npm:vitest"
+          ]
+        },
+        {
+          "file": "apps/api/tsconfig.json",
+          "hash": "1160033699231668303"
+        }
+      ],
+      "web": [
+        {
+          "file": "apps/web/next.config.ts",
+          "hash": "297256146516904911"
+        },
+        {
+          "file": "apps/web/project.json",
+          "hash": "17518213892417989525"
+        },
+        {
+          "file": "apps/web/src/app/globals.css",
+          "hash": "15169269398423650705"
+        },
+        {
+          "file": "apps/web/src/app/layout.tsx",
+          "hash": "17444441475612091222"
+        },
+        {
+          "file": "apps/web/src/app/page.tsx",
+          "hash": "6710352560120798702"
+        },
+        {
+          "file": "apps/web/src/components/ChatApp.tsx",
+          "hash": "6694603118483720118",
+          "deps": [
+            "shared"
+          ]
+        },
+        {
+          "file": "apps/web/src/components/MemoryPanel.tsx",
+          "hash": "7782835297691006464",
+          "deps": [
+            "shared"
+          ]
+        },
+        {
+          "file": "apps/web/src/lib/api.ts",
+          "hash": "9135974975320715623",
+          "deps": [
+            "shared"
+          ]
+        },
+        {
+          "file": "apps/web/tsconfig.json",
+          "hash": "16659086080475302204"
+        }
+      ]
+    }
+  }
+}

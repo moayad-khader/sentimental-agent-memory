@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "outDir": "../../dist/apps/api",
+    "rootDir": "src",
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"],
+      "@smg/shared": ["../../libs/shared/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

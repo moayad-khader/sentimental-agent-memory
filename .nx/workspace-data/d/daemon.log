@@ -1,0 +1,80 @@
+[NX v20.8.4 Daemon Server] - 2026-05-28T12:37:20.922Z - Started listening on: /private/var/folders/t2/6zqhfmkd73321xwrjrppz_sw0000gn/T/79d2e5caa5dfaae17b47/d.sock
+[NX v20.8.4 Daemon Server] - 2026-05-28T12:37:20.925Z - [WATCHER]: Subscribed to changes within: /Users/moayadkhader/Desktop/side-projects/sentimental-memory-graph (native)
+[NX v20.8.4 Daemon Server] - 2026-05-28T12:37:20.928Z - Established a connection. Number of open connections: 1
+[NX v20.8.4 Daemon Server] - 2026-05-28T12:37:20.929Z - Established a connection. Number of open connections: 2
+[NX v20.8.4 Daemon Server] - 2026-05-28T12:37:20.930Z - Closed a connection. Number of open connections: 1
+[NX v20.8.4 Daemon Server] - 2026-05-28T12:37:20.932Z - [REQUEST]: Responding to the client. Shutdown initiated
+[NX v20.8.4 Daemon Server] - 2026-05-28T12:37:20.932Z - Done responding to the client Shutdown initiated
+[NX v20.8.4 Daemon Server] - 2026-05-28T12:37:20.932Z - Handled FORCE_SHUTDOWN. Handling time: 0. Response time: 0.
+[NX v20.8.4 Daemon Server] - 2026-05-28T12:37:20.933Z - Closed a connection. Number of open connections: 0
+[NX v20.8.4 Daemon Server] - 2026-05-28T12:37:20.934Z - [WATCHER]: Stopping the watcher for /Users/moayadkhader/Desktop/side-projects/sentimental-memory-graph (sources)
+[NX v20.8.4 Daemon Server] - 2026-05-28T12:37:20.934Z - [WATCHER]: Stopping the watcher for /Users/moayadkhader/Desktop/side-projects/sentimental-memory-graph (outputs)
+[NX v20.8.4 Daemon Server] - 2026-05-28T12:37:20.934Z - Server stopped because: "Request to shutdown"
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.182Z - Started listening on: /private/var/folders/t2/6zqhfmkd73321xwrjrppz_sw0000gn/T/79d2e5caa5dfaae17b47/d.sock
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.186Z - [WATCHER]: Subscribed to changes within: /Users/moayadkhader/Desktop/side-projects/sentimental-memory-graph (native)
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.189Z - Established a connection. Number of open connections: 1
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.190Z - Established a connection. Number of open connections: 2
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.192Z - Closed a connection. Number of open connections: 1
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.193Z - [REQUEST]: Client Request for Project Graph Received
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.198Z - Time taken for 'loadSpecifiedNxPlugins' 1.25108800000001ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.467Z - Time taken for 'Load Nx Plugin: /Users/moayadkhader/Desktop/side-projects/sentimental-memory-graph/node_modules/.pnpm/nx@20.8.4/node_modules/nx/src/plugins/project-json/build-nodes/project-json' 272.24205799999993ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.473Z - Time taken for 'Load Nx Plugin: /Users/moayadkhader/Desktop/side-projects/sentimental-memory-graph/node_modules/.pnpm/nx@20.8.4/node_modules/nx/src/plugins/package-json' 278.352551ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.491Z - [REQUEST]: Updated workspace context based on watched changes, recomputing project graph...
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.491Z - [REQUEST]: 
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.491Z - [REQUEST]: 
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.498Z - Time taken for 'loadDefaultNxPlugins' 296.07360800000004ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.669Z - Time taken for 'build-project-configs' 155.12245099999996ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.716Z - [SYNC]: collect registered sync generators
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.716Z - [REQUEST]: Responding to the client. project-graph
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.722Z - Time taken for 'total for creating and serializing project graph' 523.419937ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.726Z - Done responding to the client project-graph
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.726Z - Handled REQUEST_PROJECT_GRAPH. Handling time: 523. Response time: 10.
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:05:38.765Z - Closed a connection. Number of open connections: 0
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:12.244Z - [WATCHER]: 1 file(s) created or restored, 0 file(s) modified, 1 file(s) deleted
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:12.245Z - [WATCHER]: Processing file changes in outputs
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:12.346Z - [REQUEST]: Updated workspace context based on watched changes, recomputing project graph...
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:12.346Z - [REQUEST]: .claude/settings.local.json
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:12.346Z - [REQUEST]: .claude/settings.local.json.tmp.40326.071228b1e853
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:12.349Z - Time taken for 'hash changed files from watcher' 0.7676680000004126ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:12.368Z - Time taken for 'build-project-configs' 15.320342999999411ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:12.399Z - [SYNC]: collect registered sync generators
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:12.400Z - [SYNC]: project graph hash is the same, not collecting task sync generators
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:12.400Z - [SYNC]: nx.json hash is the same, not collecting global sync generators
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:12.400Z - Time taken for 'total execution time for createProjectGraph()' 25.60625300000538ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:52.966Z - [WATCHER]: _tmp_42678_80d95d383394e54ff66fab993784ead1 was deleted
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:52.967Z - [WATCHER]: Processing file changes in outputs
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:53.168Z - [REQUEST]: Updated workspace context based on watched changes, recomputing project graph...
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:53.168Z - [REQUEST]: 
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:53.168Z - [REQUEST]: _tmp_42678_80d95d383394e54ff66fab993784ead1
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:53.171Z - Time taken for 'hash changed files from watcher' 0.18791000000783242ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:53.190Z - Time taken for 'build-project-configs' 16.60925199999474ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:53.219Z - [SYNC]: collect registered sync generators
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:53.220Z - [SYNC]: project graph hash is the same, not collecting task sync generators
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:53.220Z - [SYNC]: nx.json hash is the same, not collecting global sync generators
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:07:53.220Z - Time taken for 'total execution time for createProjectGraph()' 25.83102000001236ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:19:57.960Z - [WATCHER]: 1 file(s) created or restored, 0 file(s) modified, 1 file(s) deleted
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:19:57.963Z - [WATCHER]: Processing file changes in outputs
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:19:58.065Z - [REQUEST]: Updated workspace context based on watched changes, recomputing project graph...
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:19:58.065Z - [REQUEST]: .claude/settings.local.json
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:19:58.065Z - [REQUEST]: .claude/settings.local.json.tmp.40326.2c522ca52925
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:19:58.071Z - Time taken for 'hash changed files from watcher' 0.4809630000963807ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:19:58.122Z - Time taken for 'build-project-configs' 45.67558399995323ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:19:58.154Z - [SYNC]: collect registered sync generators
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:19:58.154Z - [SYNC]: project graph hash is the same, not collecting task sync generators
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:19:58.154Z - [SYNC]: nx.json hash is the same, not collecting global sync generators
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:19:58.155Z - Time taken for 'total execution time for createProjectGraph()' 29.023811999941245ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:20:28.856Z - [WATCHER]: Processing file changes in outputs
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:20:28.857Z - [WATCHER]: _tmp_43116_42d8af78302f09d2a2190c69bb9d7f7a was deleted
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:20:29.058Z - [REQUEST]: Updated workspace context based on watched changes, recomputing project graph...
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:20:29.058Z - [REQUEST]: 
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:20:29.058Z - [REQUEST]: _tmp_43116_42d8af78302f09d2a2190c69bb9d7f7a
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:20:29.093Z - Time taken for 'hash changed files from watcher' 0.19671299995388836ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:20:29.135Z - Time taken for 'build-project-configs' 36.74057699996047ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:20:29.179Z - [SYNC]: collect registered sync generators
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:20:29.179Z - [SYNC]: project graph hash is the same, not collecting task sync generators
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:20:29.179Z - [SYNC]: nx.json hash is the same, not collecting global sync generators
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:20:29.180Z - Time taken for 'total execution time for createProjectGraph()' 42.78411799995229ms
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:20:39.993Z - [WATCHER]: Processing file changes in outputs
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:20:39.993Z - [WATCHER]: Stopping the watcher for /Users/moayadkhader/Desktop/side-projects/sentimental-memory-graph (sources)
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:20:39.994Z - [WATCHER]: Stopping the watcher for /Users/moayadkhader/Desktop/side-projects/sentimental-memory-graph (outputs)
+[NX v20.8.4 Daemon Server] - 2026-05-28T13:20:39.997Z - Server stopped because: "LOCK_FILES_CHANGED"
