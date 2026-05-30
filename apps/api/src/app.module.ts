@@ -14,10 +14,31 @@ export class AppModule {
 
     app.addHook("onRequest", (req, reply, done) => {
       reply.header("Access-Control-Allow-Origin", "*");
-      reply.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      reply.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
       reply.header("Access-Control-Allow-Headers", "Content-Type");
       if (req.method === "OPTIONS") { reply.status(204).send(); return; }
       done();
+    });
+
+    app.get("/health", async () => ({ status: "ok" }));
+
+    app.delete("/flush", async (_req, reply) => {
+      const neo4j = Neo4jClient.getInstance();
+      const session = neo4j.getSession();
+      try {
+        await session.run("MATCH (n) DETACH DELETE n");
+      } finally {
+        await session.close();
+      }
+      const ds = PostgresClient.getInstance().getDataSource();
+      await ds.query(`
+        TRUNCATE TABLE
+          smg_extraction_log, smg_co_occurrences, smg_episode_entities,
+          smg_episodes, smg_preferences, smg_facts,
+          smg_sentiments, smg_entities, smg_users
+        RESTART IDENTITY CASCADE
+      `);
+      reply.send({ flushed: true });
     });
 
     app.register(async (instance) => {

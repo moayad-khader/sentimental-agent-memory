@@ -7,10 +7,18 @@ export interface ChatRequest {
   useMemory: boolean;
 }
 
+export interface ExtractedItem {
+  name: string;
+  type: string;
+  sentiment?: string;
+  emotion?: string;
+}
+
 export interface ChatResponse {
   response: string;
   userId: string;
   useMemory: boolean;
+  extracted?: { entities: ExtractedItem[]; factsCount: number; preferencesCount: number };
 }
 
 // ── Simulation ────────────────────────────────────────────────────────────────

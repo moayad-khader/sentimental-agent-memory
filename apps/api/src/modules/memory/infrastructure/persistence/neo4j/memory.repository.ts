@@ -38,8 +38,11 @@ export class MemoryRepository implements IMemoryRepository {
       ),
       this.run(
         `MATCH (a:Entity)-[r:CO_OCCURS]->(b:Entity)
-         WHERE r.weight > 0.2
-         AND EXISTS { MATCH (:User {id: $userId})-[:SENTIMENT|FACT|PREFERS]->(a) }
+         WHERE r.weight > 0
+         AND (
+           EXISTS { MATCH (:User {id: $userId})-[:SENTIMENT|FACT|PREFERS]->(a) }
+           OR EXISTS { MATCH (:User {id: $userId})-[:SENTIMENT|FACT|PREFERS]->(b) }
+         )
          RETURN a.id AS entityAId, a.name AS entityAName,
                 b.id AS entityBId, b.name AS entityBName,
                 r.weight AS weight, r.observedCount AS observedCount, r.lastSeen AS lastSeen

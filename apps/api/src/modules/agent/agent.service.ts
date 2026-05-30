@@ -22,16 +22,22 @@ export class AgentService {
 
     const response = await this.llm.generate({ systemPrompt, userMessage: message });
 
+    let extracted: ChatResponse["extracted"];
     if (useMemory) {
-      await this.memoryService.ingest({
-        userId,
-        userName,
-        conversationTurn: message,
-        source: "conversation",
+      const result = await this.memoryService.ingest({
+        userId, userName, conversationTurn: message, source: "conversation",
       });
+      extracted = {
+        entities: result.entities.map(e => {
+          const s = result.sentiments.find(s => s.targetName === e.name);
+          return { name: e.name, type: e.type, sentiment: s?.sentiment, emotion: s?.emotion };
+        }),
+        factsCount: result.facts.length,
+        preferencesCount: result.preferences.length,
+      };
     }
 
-    return { response, userId, useMemory };
+    return { response, userId, useMemory, extracted };
   }
 
   private buildBaseSystemPrompt(userName: string): string {

@@ -7,5 +7,6 @@ export const FUZZY_MATCH_THRESHOLD = requireEnvFloat("FUZZY_MATCH_THRESHOLD");
 export const DEFAULT_HALF_LIFE_DAYS = requireEnvInt("DEFAULT_HALF_LIFE_DAYS");
 export const LLM_VENDOR = requireEnvString("LLM_VENDOR");
 export const GEMINI_MODEL = requireEnvString("GEMINI_MODEL");
+export const GEMINI_EXTRACTION_MODEL = process.env.GEMINI_EXTRACTION_MODEL ?? GEMINI_MODEL;
 export const HEBBIAN_DELTA = requireEnvFloat("HEBBIAN_DELTA");
 export const EPISODE_WINDOW_MINUTES = requireEnvInt("EPISODE_WINDOW_MINUTES");

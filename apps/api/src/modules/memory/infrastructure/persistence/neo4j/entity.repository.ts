@@ -208,6 +208,37 @@ export class EntityRepository implements IEntityRepository {
     }
   }
 
+  async archiveSentiment(userId: string, entityId: string, emotion: string): Promise<void> {
+    const session = this.neo4j.getSession();
+    try {
+      await session.run(
+        `MATCH (u:User {id: $userId})-[r:SENTIMENT {emotion: $emotion}]->(e:Entity {id: $entityId})
+         SET r.archived = true`,
+        { userId, entityId, emotion }
+      );
+    } finally { await session.close(); }
+  }
+
+  async deleteFact(userId: string, entityId: string, relation: string): Promise<void> {
+    const session = this.neo4j.getSession();
+    try {
+      await session.run(
+        `MATCH (u:User {id: $userId})-[r:FACT {relation: $relation}]->(e:Entity {id: $entityId}) DELETE r`,
+        { userId, entityId, relation }
+      );
+    } finally { await session.close(); }
+  }
+
+  async deletePreference(userId: string, entityId: string): Promise<void> {
+    const session = this.neo4j.getSession();
+    try {
+      await session.run(
+        `MATCH (u:User {id: $userId})-[r:PREFERS]->(e:Entity {id: $entityId}) DELETE r`,
+        { userId, entityId }
+      );
+    } finally { await session.close(); }
+  }
+
   // ── private helpers ───────────────────────────────────────────────
 
   private async getExistingSentiment(

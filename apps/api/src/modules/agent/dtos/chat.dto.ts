@@ -13,4 +13,5 @@ export interface ChatResponse {
   response: string;
   userId: string;
   useMemory: boolean;
+  extracted?: { entities: Array<{ name: string; type: string; sentiment?: string; emotion?: string }>; factsCount: number; preferencesCount: number };
 }

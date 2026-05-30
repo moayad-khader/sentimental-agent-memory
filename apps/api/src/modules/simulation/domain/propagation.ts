@@ -1,4 +1,4 @@
-import type { AgentState, NetworkEdge, SentimentDrift, TickResult } from "./agent";
+import type { AgentSentiment, AgentState, NetworkEdge, SentimentDrift, TickResult } from "./agent";
 
 export interface PropagationConfig {
   /** How strongly neighbors pull a sentiment per tick. Default 0.02 (2%). */
@@ -10,8 +10,8 @@ export interface PropagationConfig {
 }
 
 const DEFAULTS: PropagationConfig = {
-  influenceRate: 0.02,
-  minEdgeWeight: 0.2,
+  influenceRate: 0.08,
+  minEdgeWeight: 0.05,
   minDriftThreshold: 0.001,
 };
 
@@ -46,15 +46,24 @@ export function runTick(
     if (neighbors.length === 0) continue;
 
     for (const [emotion, current] of agent.sentiments) {
-      // Collect neighbor valences for this emotion
+      // Collect neighbor influence: use same-emotion valence if available,
+      // otherwise fall back to the neighbor's dominant (highest |valence|) sentiment.
       const influences: { valence: number; weight: number; name: string }[] = [];
 
       for (const { entityId: nId, weight } of neighbors) {
         const neighbor = agents.get(nId);
         if (!neighbor) continue;
-        const ns = neighbor.sentiments.get(emotion);
-        if (!ns) continue;
-        influences.push({ valence: ns.valence, weight, name: neighbor.entityName });
+        const exact = neighbor.sentiments.get(emotion);
+        if (exact) {
+          influences.push({ valence: exact.valence, weight, name: neighbor.entityName });
+        } else {
+          // Pick the neighbor's dominant sentiment by absolute valence
+          let dominant: AgentSentiment | undefined;
+          for (const ns of neighbor.sentiments.values()) {
+            if (!dominant || Math.abs(ns.valence) > Math.abs(dominant.valence)) dominant = ns;
+          }
+          if (dominant) influences.push({ valence: dominant.valence, weight, name: neighbor.entityName });
+        }
       }
 
       if (influences.length === 0) continue;

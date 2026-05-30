@@ -11,11 +11,11 @@ import { LogRepository } from "@/modules/memory/infrastructure/persistence/relat
 import { StoreRepository } from "@/modules/memory/infrastructure/persistence/relational/repositories/store.repository";
 import { MemoryService } from "@/modules/memory/memory.service";
 import { MemoryController } from "@/modules/memory/memory.controller";
-import { LLM_VENDOR } from "@/config/constants";
+import { LLM_VENDOR, GEMINI_EXTRACTION_MODEL } from "@/config/constants";
 
 export class MemoryModule {
   static register(app: FastifyInstance): MemoryService {
-    const llm = new LLMVendorStrategy().resolve(LLM_VENDOR);
+    const llm = new LLMVendorStrategy().resolve(LLM_VENDOR, GEMINI_EXTRACTION_MODEL);
     const hebbian = new HebbianEngine();
     const ds = PostgresClient.getInstance().getDataSource();
 

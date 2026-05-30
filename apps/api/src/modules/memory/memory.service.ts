@@ -1,5 +1,6 @@
 import { DEFAULT_HALF_LIFE_DAYS } from "@/config/constants";
 import { applySalience } from "@/modules/memory/domain/salience";
+import { applyCertainty } from "@/modules/memory/domain/certainty";
 import type { ExtractionResult } from "@/modules/memory/domain/schema/types/extraction.types";
 import type { EntityNode } from "@/modules/memory/domain/schema/types/nodes.types";
 import type { FactEdge, PreferenceEdge, SentimentEdge } from "@/modules/memory/domain/schema/types/edges.types";
@@ -42,7 +43,7 @@ export class MemoryService {
       this.storeRepository.upsertEntities(resolved),
     ]);
 
-    const { facts, preferences, sentiments } = this.buildEdges(extraction, resolved, userId, now);
+    const { facts, preferences, sentiments } = this.buildEdges(extraction, resolved, userId, now, conversationTurn);
     const episodeId = await this.storeRepository.resolveEpisodeId(userId, source, timestamp);
     const episodeNode = { id: episodeId, userId, timestamp, source };
     const entityIds = resolved.map((e) => e.id);
@@ -72,6 +73,18 @@ export class MemoryService {
     return this.logRepository.getHistory(userId);
   }
 
+  async archiveSentiment(userId: string, entityId: string, emotion: string): Promise<void> {
+    await this.entityRepository.archiveSentiment(userId, entityId, emotion);
+  }
+
+  async deleteFact(userId: string, entityId: string, relation: string): Promise<void> {
+    await this.entityRepository.deleteFact(userId, entityId, relation);
+  }
+
+  async deletePreference(userId: string, entityId: string): Promise<void> {
+    await this.entityRepository.deletePreference(userId, entityId);
+  }
+
   private resolvedNameToId(name: string, resolved: EntityNode[]): string | undefined {
     return resolved.find(
       (e) =>
@@ -84,7 +97,8 @@ export class MemoryService {
     extraction: ExtractionResult,
     resolved: EntityNode[],
     userId: string,
-    now: string
+    now: string,
+    conversationTurn: string
   ): { facts: FactEdge[]; preferences: PreferenceEdge[]; sentiments: SentimentEdge[] } {
     const facts: FactEdge[] = extraction.facts.flatMap((f) => {
       const subjectId = f.subjectName.toLowerCase() === "user" ? userId : this.resolvedNameToId(f.subjectName, resolved);
@@ -107,7 +121,7 @@ export class MemoryService {
       return [{
         subjectId, objectId,
         sentiment: s.sentiment, emotion: s.emotion, reason: s.reason,
-        confidence: applySalience(s.emotion, s.confidence),
+        confidence: applySalience(s.emotion, applyCertainty(conversationTurn, s.confidence)),
         observedAt: now,
         halfLifeDays: DEFAULT_HALF_LIFE_DAYS,
         decayPolicy: "exponential" as const,

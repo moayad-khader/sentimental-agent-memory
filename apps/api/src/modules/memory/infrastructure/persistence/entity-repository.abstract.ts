@@ -11,4 +11,7 @@ export interface IEntityRepository {
   upsertSentiments(sentiments: SentimentEdge[], now: string): Promise<void>;
   upsertEpisode(episode: EpisodeNode, entityIds: string[]): Promise<void>;
   upsertCoOccurrences(entityIds: string[], now: string): Promise<void>;
+  archiveSentiment(userId: string, entityId: string, emotion: string): Promise<void>;
+  deleteFact(userId: string, entityId: string, relation: string): Promise<void>;
+  deletePreference(userId: string, entityId: string): Promise<void>;
 }

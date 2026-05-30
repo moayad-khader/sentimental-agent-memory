@@ -42,7 +42,7 @@ export const ExtractedSentimentSchema = z.object({
     "fear",
     "satisfaction",
     "disappointment",
-  ]),
+  ]).catch("frustration"),
   reason: z.string(),
   confidence: z.number().min(0).max(1),
 });

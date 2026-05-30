@@ -23,3 +23,23 @@ export async function runSimulation(userId: string): Promise<TickResult> {
   if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
   return res.json() as Promise<TickResult>;
 }
+
+export async function flushAll(): Promise<void> {
+  const res = await fetch(`${BASE}/flush`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+}
+
+export async function archiveSentiment(userId: string, entityId: string, emotion: string): Promise<void> {
+  const res = await fetch(`${BASE}/memory/${encodeURIComponent(userId)}/sentiment/${encodeURIComponent(entityId)}/${encodeURIComponent(emotion)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+}
+
+export async function deleteFact(userId: string, entityId: string, relation: string): Promise<void> {
+  const res = await fetch(`${BASE}/memory/${encodeURIComponent(userId)}/fact/${encodeURIComponent(entityId)}/${encodeURIComponent(relation)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+}
+
+export async function deletePreference(userId: string, entityId: string): Promise<void> {
+  const res = await fetch(`${BASE}/memory/${encodeURIComponent(userId)}/preference/${encodeURIComponent(entityId)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+}

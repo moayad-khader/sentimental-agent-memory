@@ -1,45 +1,66 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { MemoryResponse, TickResult } from "@smg/shared";
-import { getMemory, sendChat, runSimulation } from "@/lib/api";
+import { useCallback, useEffect, useRef, useState, type FC } from "react";
+import { Send, Trash2 } from "lucide-react";
+import type { MemoryResponse, TickResult, ChatResponse } from "@smg/shared";
+import { getMemory, sendChat, runSimulation, flushAll } from "@/lib/api";
 import { MemoryPanel } from "./MemoryPanel";
+import { SimulationPanel } from "./SimulationPanel";
+import { cn } from "@/lib/utils";
 
 interface Message {
   role: "user" | "agent";
   text: string;
+  extracted?: ChatResponse["extracted"];
 }
 
 export function ChatApp() {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "agent", text: "Hey! I remember everything we talk about. What's on your mind?" },
+  const [messages, setMessages]     = useState<Message[]>([
+    { role: "agent", text: "Hey — I'll remember everything we talk about. What's on your mind?" },
   ]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState("mo");
-  const [userName, setUserName] = useState("Moayad");
-  const [useMemory, setUseMemory] = useState(true);
-  const [memory, setMemory] = useState<MemoryResponse | null>(null);
-  const [online, setOnline] = useState(false);
+  const [input, setInput]           = useState("");
+  const [loading, setLoading]       = useState(false);
+  const [userId, setUserId]         = useState("mo");
+  const [userName, setUserName]     = useState("Moayad");
+  const [useMemory, setUseMemory]   = useState(true);
+  const [memory, setMemory]         = useState<MemoryResponse | null>(null);
+  const [online, setOnline]         = useState(false);
   const [simulating, setSimulating] = useState(false);
-  const [lastTick, setLastTick] = useState<TickResult | null>(null);
+  const [lastTick, setLastTick]     = useState<TickResult | null>(null);
+  const [flushing, setFlushing]     = useState(false);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-
-  useEffect(() => { scrollBottom(); }, [messages]);
+  const bottomRef   = useRef<HTMLDivElement>(null);
+  const msgCountRef = useRef(0);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   const loadMemory = useCallback(async () => {
     if (!userId) return;
-    try {
-      const data = await getMemory(userId);
-      setMemory(data);
-      setOnline(true);
-    } catch { setOnline(false); }
+    try { setMemory(await getMemory(userId)); setOnline(true); }
+    catch { setOnline(false); }
   }, [userId]);
 
   useEffect(() => { loadMemory(); }, [loadMemory]);
+
+  async function send() {
+    const text = input.trim();
+    if (!text || !userId || !userName || loading) return;
+    setInput("");
+    setMessages(p => [...p, { role: "user", text }]);
+    setLoading(true);
+    try {
+      const res = await sendChat({ userId, userName, message: text, useMemory });
+      setMessages(p => [...p, { role: "agent", text: res.response, extracted: res.extracted }]);
+      setOnline(true);
+      if (useMemory) {
+        await loadMemory();
+        msgCountRef.current += 1;
+        if (msgCountRef.current % 5 === 0) simulate();
+      }
+    } catch (e: unknown) {
+      setMessages(p => [...p, { role: "agent", text: `Error: ${e instanceof Error ? e.message : "Unknown"}` }]);
+      setOnline(false);
+    } finally { setLoading(false); }
+  }
 
   async function simulate() {
     if (!userId || simulating) return;
@@ -49,286 +70,236 @@ export function ChatApp() {
       setLastTick(result);
       if (result.drifts.length > 0) await loadMemory();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Unknown error";
-      setMessages((prev) => [...prev, { role: "agent", text: `Simulation error: ${msg}` }]);
-    } finally {
-      setSimulating(false);
-    }
+      setMessages(p => [...p, { role: "agent", text: `Simulation error: ${e instanceof Error ? e.message : "Unknown"}` }]);
+    } finally { setSimulating(false); }
   }
 
-  async function send() {
-    const text = input.trim();
-    if (!text || !userId || !userName || loading) return;
-    setInput("");
-    setMessages((prev) => [...prev, { role: "user", text }]);
-    setLoading(true);
+  async function flush() {
+    if (!confirm("Delete all memory data from both databases?")) return;
+    setFlushing(true);
     try {
-      const res = await sendChat({ userId, userName, message: text, useMemory });
-      setMessages((prev) => [...prev, { role: "agent", text: res.response }]);
-      setOnline(true);
-      if (useMemory) await loadMemory();
+      await flushAll();
+      setMemory(null);
+      setLastTick(null);
+      setMessages([{ role: "agent", text: "Cleared. Starting fresh." }]);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Unknown error";
-      setMessages((prev) => [...prev, { role: "agent", text: `Error: ${msg}` }]);
-      setOnline(false);
-    } finally {
-      setLoading(false);
-    }
+      alert(`Failed: ${e instanceof Error ? e.message : "Unknown error"}`);
+    } finally { setFlushing(false); }
   }
 
-  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-  }
+  const initial = (userName[0] || "U").toUpperCase();
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+    <div className="flex flex-col h-screen" style={{ background: "#f8f7f4" }}>
+
       {/* Header */}
-      <header style={{
-        display: "flex", alignItems: "center", gap: 12,
-        padding: "12px 20px", background: "var(--surface)",
-        borderBottom: "1px solid var(--border)", flexShrink: 0,
-      }}>
-        <div style={{
-          width: 8, height: 8, borderRadius: "50%",
-          background: online ? "var(--green)" : "var(--red)", flexShrink: 0,
-        }} />
-        <h1 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-muted)", letterSpacing: ".04em" }}>
-          SMG Agent
-        </h1>
+      <header className="flex items-center gap-0 px-4 bg-white border-b border-[#e4e0d8] shrink-0" style={{ height: 48 }}>
+
+        {/* Brand */}
+        <div className="flex items-center gap-2 pr-4 border-r border-[#e4e0d8]">
+          <div className="w-5 h-5 rounded bg-violet-600 flex items-center justify-center shrink-0">
+            <span className="text-white font-bold" style={{ fontSize: 8, letterSpacing: "0.05em" }}>MG</span>
+          </div>
+          <span className="font-semibold text-[13px] text-zinc-800 tracking-tight">Memoria</span>
+        </div>
+
+        {/* Status */}
+        <div className="flex items-center gap-1.5 px-4 border-r border-[#e4e0d8]">
+          <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", online ? "bg-emerald-400" : "bg-red-400")} />
+          <span className={cn("text-[11px]", online ? "text-emerald-600" : "text-red-500")}>
+            {online ? "connected" : "offline"}
+          </span>
+        </div>
 
         {/* Memory toggle */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 16 }}>
+        <div className="flex items-center gap-2.5 px-4 border-r border-[#e4e0d8]">
           <button
-            onClick={() => setUseMemory((v) => !v)}
-            style={{
-              position: "relative", width: 36, height: 20, cursor: "pointer",
-              background: "none", border: "none", padding: 0,
-            }}
-            title="Toggle sentimental memory"
+            onClick={() => setUseMemory(v => !v)}
+            title="Toggle memory"
+            className={cn(
+              "relative rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
+              useMemory ? "bg-violet-600" : "bg-stone-200"
+            )}
+            style={{ width: 30, height: 17 }}
           >
-            <div style={{
-              position: "absolute", inset: 0,
-              background: useMemory ? "var(--accent)" : "var(--border2)",
-              borderRadius: 10, transition: "background .2s",
-            }} />
-            <div style={{
-              position: "absolute", top: 3, left: 3, width: 14, height: 14,
-              background: "#fff", borderRadius: "50%", transition: "transform .2s",
-              transform: useMemory ? "translateX(16px)" : "none",
-            }} />
+            <span className={cn(
+              "absolute top-[2px] w-[13px] h-[13px] bg-white rounded-full shadow-sm transition-all duration-200",
+              useMemory ? "left-[15px]" : "left-[2px]"
+            )} />
           </button>
-          <span style={{
-            fontSize: 12, cursor: "pointer",
-            color: useMemory ? "#a5b4fc" : "var(--text-dim)",
-          }}>
+          <span className={cn("text-[12px] font-medium select-none", useMemory ? "text-violet-700" : "text-stone-400")}>
             {useMemory ? "Memory on" : "Memory off"}
           </span>
         </div>
 
-        {/* Simulate button */}
-        {useMemory && (
-          <button
-            onClick={simulate}
-            disabled={simulating}
-            title="Run one ABM tick — sentiments spread through co-occurrence network"
-            style={{
-              marginLeft: 8,
-              background: simulating ? "var(--border2)" : "#1e1b4b",
-              border: "1px solid #3730a3",
-              borderRadius: 6,
-              color: simulating ? "var(--text-dim)" : "#a5b4fc",
-              fontSize: 12,
-              padding: "4px 10px",
-              cursor: simulating ? "not-allowed" : "pointer",
-              transition: "all .15s",
-              flexShrink: 0,
-            }}
-          >
-            {simulating ? "Simulating…" : "Run tick"}
-          </button>
-        )}
+        {/* Spacer */}
+        <div className="flex-1" />
 
-        {/* Identity inputs */}
-        <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+        {/* User fields */}
+        <div className="flex items-center gap-2 px-4 border-l border-[#e4e0d8]">
           {[
-            { id: "userId", value: userId, setter: setUserId, placeholder: "user id" },
-            { id: "userName", value: userName, setter: setUserName, placeholder: "user name" },
-          ].map(({ id, value, setter, placeholder }) => (
+            { value: userId,   setter: setUserId,   placeholder: "user id",   w: 88 },
+            { value: userName, setter: setUserName, placeholder: "name",      w: 96 },
+          ].map(({ value, setter, placeholder, w }) => (
             <input
-              key={id}
+              key={placeholder}
               value={value}
-              onChange={(e) => setter(e.target.value)}
+              onChange={e => setter(e.target.value)}
               placeholder={placeholder}
-              style={{
-                background: "var(--border)", border: "1px solid var(--border2)",
-                borderRadius: 6, padding: "5px 10px", fontSize: 13,
-                color: "var(--text)", width: 130, outline: "none",
-              }}
+              style={{ width: w }}
+              className="bg-[#f8f7f4] border border-[#e4e0d8] rounded-md px-2.5 py-1 text-[12px] text-zinc-700 placeholder:text-stone-400 focus:outline-none focus:ring-1 focus:ring-violet-400 focus:border-violet-400 transition-colors"
             />
           ))}
         </div>
+
+        {/* Clear */}
+        <button
+          onClick={flush}
+          disabled={flushing}
+          className="flex items-center gap-1 ml-2 text-[11px] text-stone-400 hover:text-red-500 disabled:opacity-40 transition-colors px-2 py-1"
+        >
+          <Trash2 className="w-3 h-3" />
+          {flushing ? "clearing…" : "clear"}
+        </button>
       </header>
 
       {/* Body */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+      <div className="flex flex-1 overflow-hidden">
+
         {/* Chat */}
-        <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0, borderRight: "1px solid var(--border)" }}>
-          <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
-            {messages.map((m, i) => (
-              <div key={i} style={{
-                display: "flex", gap: 10, maxWidth: "78%",
-                alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-                flexDirection: m.role === "user" ? "row-reverse" : "row",
-              }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: "50%",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 2,
-                  background: m.role === "user" ? "var(--accent)" : "var(--border)",
-                  color: m.role === "user" ? "#fff" : "var(--text-muted)",
-                  border: m.role === "agent" ? "1px solid var(--border2)" : "none",
-                }}>
-                  {m.role === "user" ? (userName[0] || "U").toUpperCase() : "AI"}
+        <div className="flex flex-col flex-1 min-w-0">
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-2xl mx-auto px-5 py-6 flex flex-col gap-6">
+              {messages.map((m, i) => (
+                <div key={i} className="flex flex-col gap-1.5">
+                  <div className={cn("flex gap-3", m.role === "user" ? "flex-row-reverse" : "flex-row")}>
+                    {/* Avatar */}
+                    <div className={cn(
+                      "w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 mt-0.5",
+                      m.role === "user"
+                        ? "bg-violet-600 text-white"
+                        : "bg-white text-stone-400 border border-[#e4e0d8]"
+                    )}>
+                      {m.role === "user" ? initial : "·"}
+                    </div>
+
+                    {/* Bubble */}
+                    <div className={cn(
+                      "max-w-[72%] px-4 py-3 text-[13px] leading-relaxed whitespace-pre-wrap break-words",
+                      m.role === "user"
+                        ? "bg-violet-600 text-white rounded-2xl rounded-tr-sm"
+                        : "bg-white text-zinc-800 rounded-2xl rounded-tl-sm border border-[#e4e0d8]"
+                    )}
+                      style={m.role === "agent" ? { boxShadow: "0 1px 2px rgba(0,0,0,0.04)" } : undefined}
+                    >
+                      {m.text}
+                    </div>
+                  </div>
+                  {m.role === "agent" && m.extracted && m.extracted.entities.length > 0 && (
+                    <ExtractionPreview extracted={m.extracted} />
+                  )}
                 </div>
-                <div style={{
-                  padding: "10px 14px", borderRadius: 12,
-                  fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
-                  background: m.role === "user" ? "var(--accent)" : "var(--surface2)",
-                  color: m.role === "user" ? "#fff" : "#cbd5e1",
-                  border: m.role === "agent" ? "1px solid var(--border)" : "none",
-                  borderBottomRightRadius: m.role === "user" ? 4 : 12,
-                  borderBottomLeftRadius: m.role === "agent" ? 4 : 12,
-                }}>
-                  {m.text}
+              ))}
+
+              {loading && (
+                <div className="flex gap-3">
+                  <div className="w-7 h-7 rounded-full bg-white border border-[#e4e0d8] flex items-center justify-center text-[11px] text-stone-400 mt-0.5">·</div>
+                  <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-white border border-[#e4e0d8] flex items-center gap-1"
+                    style={{ boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+                    {[0, 150, 300].map(d => (
+                      <span key={d} className="w-1.5 h-1.5 rounded-full bg-stone-300 animate-bounce" style={{ animationDelay: `${d}ms` }} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
-            {loading && (
-              <div style={{ display: "flex", gap: 10, alignSelf: "flex-start" }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: "50%", display: "flex",
-                  alignItems: "center", justifyContent: "center", fontSize: 11,
-                  fontWeight: 700, background: "var(--border)", color: "var(--text-muted)",
-                  border: "1px solid var(--border2)",
-                }}>AI</div>
-                <div style={{
-                  padding: "10px 14px", borderRadius: 12, fontSize: 14,
-                  color: "var(--text-faint)", fontStyle: "italic",
-                  background: "var(--surface2)", border: "1px solid var(--border)",
-                }}>Thinking…</div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
+              )}
+              <div ref={bottomRef} />
+            </div>
           </div>
 
           {/* Input */}
-          <div style={{
-            display: "flex", gap: 8, padding: "14px 16px",
-            borderTop: "1px solid var(--border)", background: "var(--bg)",
-          }}>
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={onKeyDown}
-              placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
-              rows={1}
-              disabled={loading}
-              style={{
-                flex: 1, background: "var(--border)", border: "1px solid var(--border2)",
-                borderRadius: 8, padding: "10px 12px", fontSize: 14,
-                color: "var(--text)", resize: "none", outline: "none",
-                fontFamily: "inherit", lineHeight: 1.5, maxHeight: 120,
-              }}
-            />
-            <button
-              onClick={send}
-              disabled={loading || !input.trim()}
-              style={{
-                background: loading || !input.trim() ? "var(--border2)" : "var(--accent)",
-                border: "none", borderRadius: 8, width: 40, height: 40,
-                cursor: loading || !input.trim() ? "not-allowed" : "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                flexShrink: 0, alignSelf: "flex-end", transition: "background .15s",
-              }}
-            >
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="#fff">
-                <path d="M2 21l21-9L2 3v7l15 2-15 2z" />
-              </svg>
-            </button>
+          <div className="border-t border-[#e4e0d8] bg-white px-4 py-3">
+            <div className="max-w-2xl mx-auto flex items-end gap-2">
+              <textarea
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                placeholder="Write something…  (Enter to send)"
+                rows={1}
+                disabled={loading}
+                className="flex-1 bg-[#f8f7f4] border border-[#e4e0d8] rounded-xl px-3.5 py-2.5 text-[13px] text-zinc-800 placeholder:text-stone-400 resize-none focus:outline-none focus:ring-1 focus:ring-violet-400 focus:border-violet-400 transition-all max-h-28 disabled:opacity-40"
+              />
+              <button
+                onClick={send}
+                disabled={loading || !input.trim()}
+                className={cn(
+                  "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all",
+                  loading || !input.trim()
+                    ? "bg-stone-100 text-stone-300 cursor-not-allowed"
+                    : "bg-violet-600 text-white hover:bg-violet-700"
+                )}
+              >
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Right sidebar */}
+        {/* Panels */}
         {useMemory && (
-          <div style={{ display: "flex", flexDirection: "column", width: 340, flexShrink: 0, overflow: "hidden" }}>
-            <MemoryPanel memory={memory} onRefresh={loadMemory} />
-            {lastTick && <TickPanel tick={lastTick} onDismiss={() => setLastTick(null)} />}
-          </div>
+          <>
+            <MemoryPanel memory={memory} onRefresh={loadMemory} userId={userId} />
+            <SimulationPanel lastTick={lastTick} simulating={simulating} onRunTick={simulate} />
+          </>
         )}
       </div>
     </div>
   );
 }
 
-// ── Tick result panel ─────────────────────────────────────────────────────────
+// ── Extraction preview ────────────────────────────────────────────────────────
 
-function TickPanel({ tick, onDismiss }: { tick: TickResult; onDismiss: () => void }) {
-  const valenceBar = (valence: number) => {
-    const pct = Math.round(Math.abs(valence) * 100);
-    const color = valence > 0 ? "#86efac" : valence < 0 ? "#fca5a5" : "#94a3b8";
-    return (
-      <div style={{ height: 3, background: "var(--border)", borderRadius: 2, overflow: "hidden", marginTop: 4 }}>
-        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 2, transition: "width .3s" }} />
-      </div>
-    );
-  };
+const SENTIMENT_DOT: Record<string, string> = {
+  positive: "bg-emerald-400",
+  negative: "bg-red-400",
+  mixed:    "bg-amber-400",
+  neutral:  "bg-stone-300",
+};
+
+function ExtractionPreview({ extracted }: { extracted: NonNullable<ChatResponse["extracted"]> }) {
+  const [open, setOpen] = useState(false);
+  const total = extracted.entities.length + extracted.factsCount + extracted.preferencesCount;
 
   return (
-    <div style={{
-      borderTop: "1px solid var(--border)", background: "var(--surface)",
-      flexShrink: 0, maxHeight: 280, overflowY: "auto",
-    }}>
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "8px 12px", borderBottom: "1px solid var(--border)",
-        position: "sticky", top: 0, background: "var(--surface2)", zIndex: 1,
-      }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em" }}>
-          Last tick — {tick.drifts.length} drift{tick.drifts.length !== 1 ? "s" : ""}
-        </span>
-        <button onClick={onDismiss} style={{
-          background: "none", border: "none", color: "var(--text-dim)",
-          cursor: "pointer", fontSize: 13, lineHeight: 1,
-        }}>✕</button>
-      </div>
-
-      {tick.drifts.length === 0 ? (
-        <div style={{ padding: 12, fontSize: 12, color: "var(--text-faint)", textAlign: "center" }}>
-          No sentiment drift — agents are in equilibrium.
+    <div className="ml-10 flex flex-col gap-1">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1.5 text-[10px] text-stone-400 hover:text-stone-600 transition-colors w-fit"
+      >
+        <span className="text-stone-300">{open ? "▾" : "▸"}</span>
+        learned {total} item{total !== 1 ? "s" : ""}
+      </button>
+      {open && (
+        <div className="flex flex-wrap gap-1.5 pl-3">
+          {extracted.entities.map((e, i) => (
+            <span key={i} className="flex items-center gap-1 text-[10px] bg-white border border-[#e4e0d8] rounded-full px-2 py-0.5 text-stone-600">
+              {e.sentiment && <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", SENTIMENT_DOT[e.sentiment] ?? "bg-stone-300")} />}
+              {e.name}
+              {e.emotion && <span className="text-stone-400">· {e.emotion}</span>}
+            </span>
+          ))}
+          {extracted.factsCount > 0 && (
+            <span className="text-[10px] bg-violet-50 border border-violet-100 rounded-full px-2 py-0.5 text-violet-600">
+              {extracted.factsCount} fact{extracted.factsCount !== 1 ? "s" : ""}
+            </span>
+          )}
+          {extracted.preferencesCount > 0 && (
+            <span className="text-[10px] bg-violet-50 border border-violet-100 rounded-full px-2 py-0.5 text-violet-600">
+              {extracted.preferencesCount} pref{extracted.preferencesCount !== 1 ? "s" : ""}
+            </span>
+          )}
         </div>
-      ) : (
-        tick.drifts.map((d, i) => (
-          <div key={i} style={{
-            padding: "8px 12px", borderTop: i > 0 ? "1px solid var(--border)" : "none",
-            fontSize: 12,
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <span style={{ fontWeight: 600, color: "#cbd5e1" }}>{d.entityName}</span>
-              <span style={{ fontSize: 10, color: "var(--text-dim)", textTransform: "uppercase" }}>{d.emotion}</span>
-            </div>
-            <div style={{ color: "var(--text-dim)", marginTop: 2, fontSize: 11 }}>
-              {d.before.sentiment} {Math.round(d.before.confidence * 100)}%
-              {" → "}
-              <span style={{ color: d.after.sentiment === "positive" ? "#86efac" : d.after.sentiment === "negative" ? "#fca5a5" : "#94a3b8" }}>
-                {d.after.sentiment} {Math.round(d.after.confidence * 100)}%
-              </span>
-            </div>
-            {valenceBar(d.after.valence)}
-            <div style={{ color: "var(--text-faint)", fontSize: 10, marginTop: 3 }}>
-              via {d.influencedBy.join(", ")}
-            </div>
-          </div>
-        ))
       )}
     </div>
   );

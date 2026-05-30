@@ -55,6 +55,7 @@ services:
       NEO4J_URI: bolt://neo4j:7687
       DATABASE_URL: postgresql://smg:${POSTGRES_PASSWORD}@postgres:5432/memory_graph
       PORT: 3000
+      GEMINI_EXTRACTION_MODEL: gemini-2.5-flash
     ports:
       - "3000:3000"
     healthcheck:

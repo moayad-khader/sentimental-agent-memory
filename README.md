@@ -1,16 +1,62 @@
-# Sentimental Memory Graph
+# Project Affectum — Sentimental Memory Graph
 
-Most AI agents remember facts. This project gives agents something more: memory of how the user *feels* about those facts, the understanding that feelings change over time, and the ability to form associations between things that appear together.
+I've been working on something lately. I call it **Project Affectum**.
 
-When a user says "I was frustrated with Vendor X because they kept delaying deliveries," a standard memory system stores a fact: *user worked with Vendor X*. This system stores the full emotional context as a graph relationship — the sentiment, the specific emotion, the reason, a confidence score, and a decay policy that reduces that confidence if the sentiment is never reinforced.
-
-The result is a memory layer that knows not just what happened, but what it meant to the user at the time, how likely it still holds true now, and what other concepts were present in the same moment.
+It started with a question I couldn't stop thinking about: how does the human brain actually store memory? Not the pop-science version. The real thing. A few hours of reading in, something clicked. I looked at the AI agent I'd been building and realized it had almost nothing in common with what I'd just read. So I built something different.
 
 ---
 
-## The Core Idea
+## The Problem
 
-Four brain-like primitives work together:
+Vector database of past messages. Key-value store for user facts. System prompt stuffed with context.
+
+This is semantic memory at best. Flat. No weight. No age. No emotion. The agent has no idea whether you mentioned something once while hedging or said it with conviction every week for a month. Everything lands the same.
+
+That's not memory. That's a log file with a search index.
+
+---
+
+## What Neuroscience Says
+
+Memory isn't one thing. It's a coalition of systems:
+
+**Episodic** — autobiographical, timestamped, tied to context. **Semantic** — raw facts, stripped of emotion. **Affective** — the brain tags everything with emotional weight. Fear, trust, frustration. That tagging changes what gets encoded and what shapes future decisions. **Associative** — neurons that fire together, wire together. The brain builds a graph of co-occurrence over time.
+
+None of this exists in the agents we build.
+
+---
+
+## The Simulation Model
+
+I looked at several approaches — spreading activation, opinion dynamics, belief propagation. Each has tradeoffs.
+
+I went with **Agent-Based Modeling**: each entity behaves as an autonomous agent with its own state and update rule. No central coordinator. Global behavior emerges from local interactions. Long-standing relationships resist drift. Peripheral nodes are easily colored by neighbors. That asymmetry is what makes it feel real.
+
+---
+
+## What This Does
+
+**NER** — every entity in conversation becomes a node in a graph.
+
+**Sentiment + Certainty Calibration** — emotional signals extracted per entity. "I sort of think maybe..." gets penalized. "I absolutely cannot stand it" gets boosted. Hedging is not conviction.
+
+**Co-occurrence Edges** — entities that appear together build weighted edges. The graph learns associations you never stated explicitly.
+
+**Episodic Anchoring** — every turn timestamped and linked to entities present. Recent episodes weigh more.
+
+**Temporal Decay** — signals fade if not reinforced. Each entity has its own half-life.
+
+**ABM Propagation** — when sentiment shifts in one node, it ripples through the graph via weighted edges. Nodes that never got a direct signal drift from proximity to the thing that changed.
+
+---
+
+An agent with this memory doesn't just remember what you said. It models how you feel about your world — and that model evolves continuously, even between conversations.
+
+The brain spent 500 million years figuring out how to remember what matters. We should steal the best parts.
+
+---
+
+## Core Primitives
 
 **Decaying synaptic weights.** Sentiment confidence degrades over time via exponential or linear decay, just as neural connections weaken without reinforcement. Re-expressing the same emotion boosts confidence back up (Long-Term Potentiation). Edges that fall below the threshold are archived rather than deleted.
 
