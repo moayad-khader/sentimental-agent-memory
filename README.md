@@ -26,45 +26,359 @@ None of this exists in the agents we build.
 
 ---
 
-## The Simulation Model
+## System Architecture
 
-I looked at several approaches — spreading activation, opinion dynamics, belief propagation. Each has tradeoffs.
+Three layers: a Next.js frontend, a Fastify API, and a dual-database store (Neo4j for the live graph, PostgreSQL for structured persistence and audit logs).
 
-I went with **Agent-Based Modeling**: each entity behaves as an autonomous agent with its own state and update rule. No central coordinator. Global behavior emerges from local interactions. Long-standing relationships resist drift. Peripheral nodes are easily colored by neighbors. That asymmetry is what makes it feel real.
+```mermaid
+flowchart TB
+    subgraph WEB ["apps/web — Next.js 15"]
+        CA["ChatApp\nchat · memory toggle · flush"]
+        MP["MemoryPanel\nsentiments · facts · prefs · episodes · links"]
+        SP["SimulationPanel\npropagation ticks · drift viewer"]
+    end
+
+    subgraph API ["apps/api — Fastify"]
+        direction LR
+        AG["POST /chat\nAgentService"]
+        MEM["POST /ingest\nGET /memory/:userId\nGET /history/:userId\nMemoryService"]
+        SIM["POST /simulate/:userId\nSimulationService"]
+    end
+
+    subgraph PIPELINE ["Memory Pipeline (inside MemoryService)"]
+        direction LR
+        EX["Gemini Extractor"]
+        ER["Entity Resolver\n(Levenshtein ≥ 0.85)"]
+        CE["Certainty\nCalibration"]
+        SAL["Salience\nEngine"]
+        DEC["Decay Engine"]
+        HEB["Hebbian Engine"]
+    end
+
+    subgraph DATA ["Data Layer"]
+        NEO["Neo4j\nlive memory graph"]
+        PG["PostgreSQL\nrelational store + audit log"]
+    end
+
+    CA -->|HTTP| AG
+    CA -->|HTTP| MEM
+    CA -->|HTTP| SIM
+    MP -->|HTTP| MEM
+    SP -->|HTTP| SIM
+
+    AG -->|reads + ingests| MEM
+    MEM --> PIPELINE
+    PIPELINE --> NEO
+    PIPELINE --> PG
+    SIM -->|reads CO_OCCURS, writes SENTIMENT| NEO
+```
 
 ---
 
-## What This Does
+## Features
 
-**NER** — every entity in conversation becomes a node in a graph.
+### 1. Memory Ingestion Pipeline
 
-**Sentiment + Certainty Calibration** — emotional signals extracted per entity. "I sort of think maybe..." gets penalized. "I absolutely cannot stand it" gets boosted. Hedging is not conviction.
+Every conversation turn flows through a six-stage pipeline before anything is written to the graph.
 
-**Co-occurrence Edges** — entities that appear together build weighted edges. The graph learns associations you never stated explicitly.
+```
+POST /ingest
+       │
+       ▼
+  IngestHandler      validates request body (userId, userName, conversationTurn, source?)
+       │
+       ▼
+  MemoryService      orchestrates the full pipeline
+       │
+       ├──▶ MemoryExtractor     calls Gemini 2.0 Flash with a structured JSON schema,
+       │                        returns entities, facts, preferences, and sentiments
+       │
+       ├──▶ EntityRepository    resolves extracted entity names against Neo4j using
+       │    (resolve)           Levenshtein similarity (≥ 0.85). Matches reuse the
+       │                        existing node and merge aliases. New entities get a UUID.
+       │
+       ├──▶ CertaintyEngine     penalises hedged language before salience is applied.
+       │                        "Maybe", "kind of", "I guess" → ×0.75 penalty.
+       │                        "Absolutely", "definitely", "hate" → ×1.10 boost.
+       │
+       ├──▶ SalienceEngine      multiplies confidence by an emotion-intensity factor.
+       │                        anger/fear → ×1.20, anticipation → ×0.85.
+       │
+       ├──▶ DecayEngine         runs at write time. Decays stored confidence by time
+       │                        elapsed, then applies +0.15 reinforcement if the same
+       │                        emotion is re-expressed. Edges below 0.15 are archived.
+       │
+       ├──▶ EntityRepository    writes users, entities, facts, preferences, and
+       │    (upsert*)           sentiments to Neo4j via MERGE. Sentiment edges are
+       │                        keyed by (subject, object, emotion) so each emotion
+       │                        maintains its own independent decay track.
+       │
+       ├──▶ EntityRepository    creates an Episode node for the turn and CONTAINS
+       │    (upsertEpisode)     edges to every resolved entity — a single batched
+       │                        UNWIND query.
+       │
+       ├──▶ HebbianEngine       generates all entity pairs in the turn, then upserts
+       │    (upsertCoOccurrences) CO_OCCURS edges via a single UNWIND query. Weight
+       │                        increments by HEBBIAN_DELTA on each co-occurrence.
+       │
+       └──▶ LogRepository       writes a full audit trail to PostgreSQL — one row per
+                                extraction, plus rows for every fact, preference, and
+                                sentiment written in this turn.
+```
 
-**Episodic Anchoring** — every turn timestamped and linked to entities present. Recent episodes weigh more.
-
-**Temporal Decay** — signals fade if not reinforced. Each entity has its own half-life.
-
-**ABM Propagation** — when sentiment shifts in one node, it ripples through the graph via weighted edges. Nodes that never got a direct signal drift from proximity to the thing that changed.
+The same upserts are also mirrored to the PostgreSQL relational store via `StoreRepository`, keeping both databases in sync.
 
 ---
 
-An agent with this memory doesn't just remember what you said. It models how you feel about your world — and that model evolves continuously, even between conversations.
+### 2. Episodic Memory
 
-The brain spent 500 million years figuring out how to remember what matters. We should steal the best parts.
+Every conversation turn is stamped as an `Episode` node and linked to every entity mentioned in it.
+
+```
+(Episode { id, userId, timestamp, source: "standup" })-[:CONTAINS]->(Vendor X)
+(Episode)-[:CONTAINS]->(Alice)
+(Episode)-[:CONTAINS]->(Sprint Planning)
+```
+
+Episodes give the agent a temporal narrative: which entities were discussed together, and when. The agent surfaces the five most recent episodes when building its system prompt, ordered by recency.
 
 ---
 
-## Core Primitives
+### 3. Sentiment Tracking with Emotion Independence
 
-**Decaying synaptic weights.** Sentiment confidence degrades over time via exponential or linear decay, just as neural connections weaken without reinforcement. Re-expressing the same emotion boosts confidence back up (Long-Term Potentiation). Edges that fall below the threshold are archived rather than deleted.
+Emotional signals are extracted per entity, per emotion. Fear and anticipation toward the same thing coexist as separate edges. One does not overwrite the other.
 
-**Emotion-keyed edges.** Each `(user, entity, emotion)` triple gets its own sentiment edge. Fear and joy about the same thing coexist simultaneously — one does not overwrite the other.
+```
+(User)-[:SENTIMENT {
+  emotion:      "frustration",
+  sentiment:    "negative",
+  confidence:   0.96,
+  ...
+}]->(Vendor X)
 
-**Emotional salience.** High-intensity emotions (anger, fear) are encoded at higher initial confidence than low-intensity ones (anticipation, satisfaction), mirroring how the amygdala boosts encoding strength for emotionally charged events.
+(User)-[:SENTIMENT {
+  emotion:      "anticipation",
+  sentiment:    "positive",
+  confidence:   0.72,
+  ...
+}]->(Vendor X)
+```
 
-**Hebbian co-activation.** Entities that appear together in the same conversation turn form a `CO_OCCURS` edge whose weight strengthens with each co-occurrence — neurons that fire together, wire together.
+The edge is keyed by `(subjectId, objectId, emotion)`. Updating a frustration reading does not touch the anticipation edge.
+
+---
+
+### 4. Certainty Calibration
+
+Before salience is applied, confidence is adjusted for the language certainty of the conversation turn — not the extracted sentiment score, which only reflects what the LLM read, but the actual hedging in what the user said.
+
+| Pattern | Multiplier |
+|---|---|
+| Strong hedges: "not sure", "might be wrong", "possibly", "unclear" | ×0.60 |
+| Mild hedges: "think", "feel like", "maybe", "kind of", "probably" | ×0.75 |
+| Strong conviction: "always", "never", "hate", "absolutely", "love" | ×1.10 |
+
+A Gemini score of 0.80 with "I kind of feel..." becomes 0.60. The same score with "I absolutely cannot stand it" becomes 0.88. Hedging is not conviction.
+
+---
+
+### 5. Emotional Salience
+
+After certainty calibration, an intensity multiplier is applied based on the emotion type, mirroring how the amygdala boosts encoding for emotionally charged events.
+
+| Multiplier | Emotions |
+|---|---|
+| ×1.20 | `anger`, `fear` |
+| ×1.10 | `frustration` |
+| ×1.05 | `sadness`, `disappointment` |
+| ×1.00 | `surprise` |
+| ×0.95 | `joy` |
+| ×0.90 | `trust`, `satisfaction` |
+| ×0.85 | `anticipation` |
+
+Multipliers are applied once at write time and baked into the initial confidence. The decay curve is the same for all edges after that.
+
+---
+
+### 6. Temporal Decay & Reinforcement
+
+Sentiment edges are not permanent. Confidence degrades over time and is updated whenever a new observation for the same `(user, entity, emotion)` triple arrives.
+
+**Exponential decay** (default):
+```
+confidence(t) = confidence₀ × 0.5 ^ (days_elapsed / half_life_days)
+```
+
+With a default half-life of 30 days, a 0.87 confidence drops to ~0.44 after 30 days and ~0.22 after 60 days.
+
+**Linear decay:**
+```
+confidence(t) = max(0, confidence₀ − (confidence₀ / half_life_days) × days_elapsed)
+```
+
+**No decay:** confidence stays fixed.
+
+**Reinforcement:** if the same sentiment and emotion are re-expressed, the decayed edge receives a +0.15 boost (capped at 1.0). If the direction changes (previously negative, now positive), the incoming score replaces the stored one rather than stacking on top of it.
+
+**Archival:** edges below 0.15 are marked `archived: true` rather than deleted. The history is preserved but excluded from live reads.
+
+---
+
+### 7. Hebbian Associations
+
+Entities that appear together in the same conversation turn form a `CO_OCCURS` edge. The weight increments on each co-occurrence and is capped at 1.0.
+
+```
+(Vendor X)-[:CO_OCCURS { weight: 0.4, observedCount: 4, lastSeen: "2026-05-26" }]->(Delivery Delays)
+```
+
+Weight starts at `HEBBIAN_DELTA` (default `0.1`) on the first co-occurrence. By the fourth, `(Vendor X, Delivery Delays)` carries weight `0.4` — a learned implicit association the user never stated directly.
+
+`CO_OCCURS` edges are global, not per-user. If two entities appear together for any user, the weight accumulates. Reads filter to entities the requesting user has touched.
+
+---
+
+### 8. ABM Propagation Simulation
+
+When sentiment shifts in one entity, it should ripple through the graph. That's the job of the simulation module.
+
+Each entity acts as an autonomous agent with its own sentiment state. A tick runs across the whole network: for each entity, it collects the sentiment valences of its direct neighbors (via `CO_OCCURS` edges above the minimum weight threshold), computes a weighted average, and nudges the entity's sentiment toward it.
+
+```
+newValence = current.valence + influenceRate × (weightedAvgNeighbor − current.valence)
+```
+
+Default `influenceRate` is `0.08`. An entity that has never received a direct sentiment reading drifts slowly from the sentiment of nearby things that have been mentioned.
+
+The result is a `TickResult`:
+
+```json
+{
+  "userId": "...",
+  "totalAgents": 12,
+  "drifts": [
+    {
+      "entityName": "Sprint Planning",
+      "emotion": "frustration",
+      "before": { "sentiment": "neutral", "confidence": 0.50 },
+      "after":  { "sentiment": "negative", "confidence": 0.54 },
+      "influencedBy": ["Vendor X", "Delivery Delays"]
+    }
+  ]
+}
+```
+
+The frontend auto-runs a tick every 5 messages and shows drift rows with before/after bars and the influencing neighbors.
+
+---
+
+### 9. Memory-Augmented Chat Agent
+
+The agent reads the full live memory graph before generating a response. Memory is formatted into a natural-language system prompt — not "according to my data" phrasing, but the voice of someone who was actually there.
+
+```
+## What you know about Moayad
+
+**Feelings & emotions:**
+  • frustration toward Vendor X [96%] — "user expressed frustration due to repeated delivery delays"
+  • anticipation toward Vendor X [72%] — "new vendor shortlist in progress"
+
+**Facts you know:**
+  • Vendor X worked_with (88%)
+
+**Preferences:**
+  • Moayad dislikes Slow Responses — past vendor delays
+
+**Recent interactions:**
+  • [standup] 2026-05-21: Vendor X, Alice, Sprint Planning
+
+**People & things that come up together:**
+  • Vendor X ↔ Delivery Delays (strength: 0.40)
+```
+
+With `useMemory: false`, the agent skips the graph read entirely and responds as a stateless assistant. Every message sent with memory on is also ingested — the agent learns from every exchange.
+
+---
+
+### 10. Live Web UI
+
+A three-panel Next.js interface built with Framer Motion.
+
+**Chat panel** — standard conversation UI. After each agent turn, an expandable "learned N items" row shows the entities and sentiments extracted from that message.
+
+**Memory panel** — five tabs:
+- **Sentiments** — entities grouped by name, each with per-emotion rows showing polarity tag, confidence bar, and reason string. Hover reveals an archive button.
+- **Facts** — relation badges and confidence bars. Hover to delete.
+- **Prefs** — polarity dots, reason strings, confidence bars. Hover to delete.
+- **Episodes** — timestamped entries with entity chips per turn.
+- **Links** — Hebbian association pairs with co-occurrence count and weight bar.
+
+**Simulation panel** — a "Run tick" button fires the ABM propagation. Results show agent count, drift count, and sentiment flip count. Each drift row shows the entity, emotion, before/after sentiment with animated progress bars, delta percentage, and which neighbors caused the influence.
+
+Memory is refreshed automatically after each message. A simulation tick runs automatically every 5 messages if there are drifts, then refreshes memory again.
+
+---
+
+## Memory Architecture
+
+```mermaid
+flowchart TD
+    subgraph PIPELINE ["Ingest Pipeline (per conversation turn)"]
+        direction LR
+        T["Conversation Turn"] --> GEM["Gemini 2.0 Flash\nExtractor"]
+        GEM --> ER["Entity Resolver\nLevenshtein ≥ 0.85"]
+        ER --> CE["Certainty\nCalibration"]
+        CE --> SAL["Salience\nEngine"]
+        SAL --> DEC["Decay Engine\n(decay + reinforce + archive)"]
+    end
+
+    subgraph NEO4J ["Neo4j — Live Memory Graph"]
+        direction TB
+        U(["User\nid · name"])
+        E(["Entity\nid · name · type · aliases"])
+        EP(["Episode\nid · userId\ntimestamp · source"])
+
+        U -->|"FACT\nrelation · confidence · observedAt"| E
+        U -->|"PREFERS\npolarity · reason\nconfidence · observedAt"| E
+        U -->|"SENTIMENT ×N per emotion\nemotion · sentiment · reason\nconfidence · halfLifeDays\ndecayPolicy · archived"| E
+        EP -->|"CONTAINS"| E
+        E -->|"CO_OCCURS\nweight · observedCount · lastSeen"| E
+    end
+
+    subgraph ABM ["ABM Propagation (simulation tick)"]
+        direction LR
+        ADJ["Build adjacency\nfrom CO_OCCURS edges"] --> INF["Weighted influence\nper entity × per emotion"]
+        INF --> DRIFT["Compute SentimentDrift\nbefore → after valence"]
+        DRIFT --> UPD["Write updated\nconfidence back to Neo4j"]
+    end
+
+    subgraph PG ["PostgreSQL — Persistence + Audit"]
+        STORE["Relational store\nsmg_entity · smg_fact\nsmg_preference · smg_sentiment\nsmg_episode · smg_co_occurrence"]
+        LOG["Audit log\nsmg_extraction_log\nsmg_fact_log · smg_preference_log\nsmg_sentiment_log"]
+    end
+
+    DEC -->|"MERGE nodes + edges"| NEO4J
+    DEC -->|"upsert rows"| STORE
+    DEC -->|"append rows"| LOG
+    NEO4J -->|"CO_OCCURS edges"| ABM
+    ABM -->|"SENTIMENT updates"| NEO4J
+```
+
+### Confidence lifecycle
+
+```
+Extracted score
+      │
+      ├─▶ applyCertainty()   hedging / conviction modifier
+      │
+      ├─▶ applySalience()    emotion-intensity multiplier
+      │
+      └─▶ DecayEngine        at write time:
+                               1. decay stored confidence by elapsed days
+                               2. if same emotion re-expressed → +0.15 boost
+                               3. if direction flipped → replace with incoming
+                               4. if result < 0.15 → archive edge
+```
 
 ---
 
@@ -104,6 +418,7 @@ Five types of memory are extracted and stored per conversation turn.
   ...
 }]->(Vendor X)
 ```
+
 Both edges exist simultaneously. Frustration and anticipation toward the same entity are independent relationships.
 
 **Episodes** — a record of each conversation turn as a node, linked to every entity mentioned in it.
@@ -112,156 +427,10 @@ Both edges exist simultaneously. Frustration and anticipation toward the same en
 (Episode)-[:CONTAINS]->(Alice)
 (Episode)-[:CONTAINS]->(Sprint Planning)
 ```
-Episodes preserve the temporal narrative: which entities were present together, and when.
 
 **Associations** — Hebbian co-activation links between entities.
 ```
 (Vendor X)-[:CO_OCCURS { weight: 0.4, observedCount: 4, lastSeen: "2026-05-26" }]->(Delivery Delays)
-```
-Weight starts at `HEBBIAN_DELTA` on first co-occurrence and increments each time, capped at 1.0.
-
----
-
-## Architecture
-
-```
-POST /ingest
-       │
-       ▼
-  IngestHandler      validates request body (userId, userName, conversationTurn, source?)
-       │
-       ▼
-  MemoryService      orchestrates the full pipeline
-       │
-       ├──▶ MemoryExtractor     calls Gemini 2.0 Flash with a structured JSON schema,
-       │                        returns entities, facts, preferences, and sentiments
-       │
-       ├──▶ EntityRepository    resolves extracted entity names against Neo4j using
-       │    (resolve)           Levenshtein similarity (≥ 0.85). Matches reuse the
-       │                        existing node and merge aliases. New entities get a UUID.
-       │
-       ├──▶ EntityRepository    writes users, entities, facts, preferences, and
-       │    (upsert*)           sentiments to Neo4j via MERGE. Sentiment edges are
-       │                        keyed by (subject, object, emotion) so each emotion
-       │                        maintains its own independent decay track.
-       │
-       ├──▶ DecayEngine         runs at write time. Decays stored confidence by time
-       │                        elapsed, then applies reinforcement if the same emotion
-       │                        is re-expressed. Edges below 0.15 are archived.
-       │
-       ├──▶ SalienceEngine      applied before writing: multiplies confidence by an
-       │                        emotion-intensity factor (anger/fear → ×1.20,
-       │                        anticipation → ×0.85). Capped at 1.0.
-       │
-       ├──▶ EntityRepository    creates an Episode node for the turn and CONTAINS
-       │    (upsertEpisode)     edges to every resolved entity — a single batched
-       │                        UNWIND query.
-       │
-       ├──▶ HebbianEngine       generates all entity pairs in the turn, then upserts
-       │    (upsertCoOccurrences) CO_OCCURS edges via a single UNWIND query. Weight
-       │                        increments by HEBBIAN_DELTA on each co-occurrence.
-       │
-       └──▶ LogRepository       writes a full audit trail to PostgreSQL — one row per
-                                extraction, plus rows for every fact, preference, and
-                                sentiment written in this turn.
-```
-
----
-
-## Confidence Decay
-
-Sentiment edges are not permanent. Confidence decays over time according to the chosen policy and is updated whenever a new observation for the same `(user, entity, emotion)` triple arrives.
-
-**Exponential decay** (default):
-```
-confidence(t) = confidence₀ × 0.5 ^ (days_elapsed / half_life_days)
-```
-With the default half-life of 30 days, a sentiment at 0.87 confidence drops to ~0.44 after 30 days, ~0.22 after 60 days, and so on.
-
-**Linear decay**:
-```
-confidence(t) = max(0, confidence₀ − (confidence₀ / half_life_days) × days_elapsed)
-```
-
-**No decay**: confidence stays fixed regardless of time.
-
-### Emotional Salience
-
-Before an edge is written, confidence is multiplied by an intensity factor derived from the emotion type:
-
-| Multiplier | Emotions |
-|---|---|
-| ×1.20 | `anger`, `fear` |
-| ×1.10 | `frustration` |
-| ×1.05 | `sadness`, `disappointment` |
-| ×1.00 | `surprise` |
-| ×0.95 | `joy` |
-| ×0.90 | `trust`, `satisfaction` |
-| ×0.85 | `anticipation` |
-
-A Gemini-extracted confidence of 0.80 for `anger` is stored as 0.96. The same score for `anticipation` is stored as 0.68. The result is that intense, explicit emotions carry more weight in the graph from the start.
-
-### Reinforcement
-
-If the user expresses the same sentiment and emotion again, the decayed confidence receives a +0.15 boost (capped at 1.0). This models the idea that hearing the same feeling twice is stronger evidence than hearing it once.
-
-If the sentiment *direction changes* (e.g., the user now feels positive about something they previously felt negative about), the confidence is replaced by the incoming score rather than being reinforced.
-
-### Archival
-
-Edges with confidence below 0.15 are marked `archived: true` rather than deleted. The history is preserved — the system knows the sentiment existed and faded — but archived edges are excluded from live memory reads.
-
----
-
-## HTTP API
-
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/ingest` | Extract memory from a conversation turn and write to Neo4j + PostgreSQL |
-| `GET` | `/memory/:userId` | Read the live memory graph for a user from Neo4j |
-| `GET` | `/history/:userId` | Read the full audit log for a user from PostgreSQL |
-
-**POST /ingest**
-```json
-{
-  "userId": "user-abc-123",
-  "userName": "Alice",
-  "conversationTurn": "I was frustrated with Vendor X because they kept delaying our deliveries.",
-  "source": "standup"
-}
-```
-`source` is optional and defaults to `"conversation"`. Useful values: `"standup"`, `"chat"`, `"api"`.
-
-**GET /memory/:userId** — response shape:
-```json
-{
-  "sentiments": [
-    {
-      "entityId": "...", "entityName": "Vendor X", "entityType": "Organization",
-      "emotion": "frustration", "sentiment": "negative",
-      "reason": "user expressed frustration due to repeated delivery delays",
-      "confidence": 0.96, "observedAt": "2026-05-21"
-    }
-  ],
-  "facts": [...],
-  "preferences": [...],
-  "episodes": [
-    {
-      "episodeId": "...", "timestamp": "2026-05-21T09:14:22.000Z",
-      "source": "standup",
-      "entities": [
-        { "id": "...", "name": "Vendor X", "type": "Organization" }
-      ]
-    }
-  ],
-  "associations": [
-    {
-      "entityAId": "...", "entityAName": "Vendor X",
-      "entityBId": "...", "entityBName": "Delivery Delays",
-      "weight": 0.4, "observedCount": 4, "lastSeen": "2026-05-26"
-    }
-  ]
-}
 ```
 
 ---
@@ -382,67 +551,165 @@ graph LR
 
 ---
 
+## HTTP API
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/ingest` | Extract memory from a conversation turn and write to Neo4j + PostgreSQL |
+| `GET`  | `/memory/:userId` | Read the live memory graph for a user from Neo4j |
+| `GET`  | `/history/:userId` | Read the full audit log for a user from PostgreSQL |
+| `POST` | `/chat` | Chat with the memory-augmented agent |
+| `POST` | `/simulate/:userId` | Run one ABM propagation tick for a user's entity network |
+
+**POST /ingest**
+```json
+{
+  "userId": "user-abc-123",
+  "userName": "Alice",
+  "conversationTurn": "I was frustrated with Vendor X because they kept delaying our deliveries.",
+  "source": "standup"
+}
+```
+
+`source` is optional and defaults to `"conversation"`. Useful values: `"standup"`, `"chat"`, `"api"`.
+
+**POST /chat**
+```json
+{
+  "userId": "user-abc-123",
+  "userName": "Alice",
+  "message": "What do you think I should do about Vendor X?",
+  "useMemory": true
+}
+```
+
+Response includes `response` (the agent reply), `userId`, `useMemory`, and an optional `extracted` field showing what the agent learned from this message.
+
+**POST /simulate/:userId**
+
+Optional body:
+```json
+{
+  "influenceRate": 0.08,
+  "minEdgeWeight": 0.05
+}
+```
+
+Response is a `TickResult` — total agents, drift count, and an array of sentiment changes with before/after confidence and which neighbors caused them.
+
+**GET /memory/:userId** — response shape:
+```json
+{
+  "sentiments": [
+    {
+      "entityId": "...", "entityName": "Vendor X", "entityType": "Organization",
+      "emotion": "frustration", "sentiment": "negative",
+      "reason": "user expressed frustration due to repeated delivery delays",
+      "confidence": 0.96, "observedAt": "2026-05-21"
+    }
+  ],
+  "facts": [...],
+  "preferences": [...],
+  "episodes": [
+    {
+      "episodeId": "...", "timestamp": "2026-05-21T09:14:22.000Z",
+      "source": "standup",
+      "entities": [{ "id": "...", "name": "Vendor X", "type": "Organization" }]
+    }
+  ],
+  "associations": [
+    {
+      "entityAId": "...", "entityAName": "Vendor X",
+      "entityBId": "...", "entityBName": "Delivery Delays",
+      "weight": 0.4, "observedCount": 4, "lastSeen": "2026-05-26"
+    }
+  ]
+}
+```
+
+---
+
 ## Project Structure
 
 ```
-src/
-├── main.ts                            # entry point — bootstraps AppModule
-├── app.module.ts                      # root module: initialises Neo4j + Postgres, registers MemoryModule
+sentimental-memory-graph/          Nx monorepo (pnpm)
+├── apps/
+│   ├── api/                       Fastify backend
+│   │   └── src/
+│   │       ├── main.ts            entry point
+│   │       ├── app.module.ts      bootstraps Neo4j + Postgres, registers modules
+│   │       │
+│   │       ├── config/
+│   │       │   ├── env.ts         typed env helpers
+│   │       │   └── constants.ts   runtime constants (thresholds, model, hebbian delta)
+│   │       │
+│   │       ├── database/
+│   │       │   ├── neo4j/client.ts           driver singleton + constraint init
+│   │       │   └── postgres/data-source.ts   TypeORM DataSource singleton
+│   │       │
+│   │       ├── llm/
+│   │       │   ├── strategy.ts    LLM adapter factory
+│   │       │   └── vendors/gemini/adapter.ts  Gemini implementation
+│   │       │
+│   │       └── modules/
+│   │           ├── agent/
+│   │           │   ├── agent.controller.ts   POST /chat
+│   │           │   ├── agent.service.ts      memory read → system prompt → LLM → ingest
+│   │           │   └── dtos/chat.dto.ts      ChatRequest / ChatResponse schemas
+│   │           │
+│   │           ├── memory/
+│   │           │   ├── memory.controller.ts  /ingest, /memory/:id, /history/:id
+│   │           │   ├── memory.service.ts     pipeline orchestrator
+│   │           │   │
+│   │           │   ├── domain/
+│   │           │   │   ├── certainty.ts      hedging calibration
+│   │           │   │   ├── decay.ts          decay + reinforcement logic
+│   │           │   │   ├── hebbian.ts        co-occurrence pair generation
+│   │           │   │   ├── salience.ts       emotion-intensity multipliers
+│   │           │   │   └── schema/           Zod schemas + inferred TS types
+│   │           │   │       ├── nodes.ts
+│   │           │   │       ├── edges.ts
+│   │           │   │       └── extraction.ts
+│   │           │   │
+│   │           │   ├── extraction/
+│   │           │   │   ├── extractor.ts      Gemini call + Zod parse
+│   │           │   │   └── prompt.ts         system prompt for extraction
+│   │           │   │
+│   │           │   └── infrastructure/persistence/
+│   │           │       ├── neo4j/
+│   │           │       │   ├── entity.repository.ts   all graph writes (MERGE)
+│   │           │       │   └── memory.repository.ts   graph reads
+│   │           │       └── relational/
+│   │           │           ├── entities/              TypeORM entities (schema source)
+│   │           │           └── repositories/
+│   │           │               ├── log.repository.ts   audit log writes + reads
+│   │           │               └── store.repository.ts relational store writes
+│   │           │
+│   │           └── simulation/
+│   │               ├── simulation.controller.ts  POST /simulate/:userId
+│   │               ├── simulation.service.ts     tick orchestrator
+│   │               ├── domain/
+│   │               │   ├── agent.ts          AgentState + SentimentDrift types
+│   │               │   └── propagation.ts    runTick() — ABM logic
+│   │               └── infrastructure/
+│   │                   └── simulation.repository.ts  reads agents, writes drifts
+│   │
+│   └── web/                       Next.js 15 frontend
+│       └── src/
+│           ├── app/
+│           │   ├── layout.tsx
+│           │   └── page.tsx
+│           ├── components/
+│           │   ├── ChatApp.tsx        root — chat, header, state, auto-tick
+│           │   ├── MemoryPanel.tsx    5-tab sidebar: sentiments/facts/prefs/episodes/links
+│           │   └── SimulationPanel.tsx propagation results viewer
+│           ├── lib/
+│           │   ├── api.ts             typed API client (all fetch calls)
+│           │   └── utils.ts           cn() helper
+│           └── types.d.ts
 │
-├── config/
-│   ├── env.ts                         # requireEnvString / requireEnvFloat / requireEnvInt helpers
-│   └── constants.ts                   # env-derived runtime constants (thresholds, model name, hebbian delta)
-│
-├── database/
-│   ├── neo4j/
-│   │   └── client.ts                  # Neo4j driver singleton + constraint init (User, Entity, Episode)
-│   └── postgres/
-│       ├── data-source.ts             # PostgresClient singleton (TypeORM DataSource)
-│       └── column-types.ts            # shared ColumnOptions constants
-│
-└── modules/
-    └── memory/
-        ├── memory.module.ts           # wires all dependencies, registers controller routes
-        ├── memory.controller.ts       # Fastify route handlers (ingest, getMemory, getHistory)
-        ├── memory.service.ts          # orchestrates extract → resolve → store → log
-        │
-        ├── dtos/
-        │   ├── ingest.dto.ts          # Zod request schema + IngestRequest type (includes source)
-        │   ├── memory.dto.ts          # MemoryResponseDto (sentiments, facts, preferences, episodes, associations)
-        │   └── history.dto.ts         # HistoryResponseDto (audit log rows)
-        │
-        ├── domain/
-        │   ├── decay.ts               # pure decay + reinforcement logic (DecayEngine)
-        │   ├── salience.ts            # emotion-intensity multipliers (applySalience)
-        │   ├── hebbian.ts             # co-occurrence pair generation + delta (HebbianEngine)
-        │   └── schema/
-        │       ├── nodes.ts           # Zod schemas for User, Entity, and Episode nodes
-        │       ├── edges.ts           # Zod schemas for Fact, Preference, Sentiment edges
-        │       ├── extraction.ts      # Zod schema for LLM extraction output
-        │       └── types/             # TypeScript types inferred from the schemas above
-        │
-        ├── extraction/
-        │   ├── extractor.ts           # Gemini call + Zod parse
-        │   └── prompt.ts              # system prompt
-        │
-        └── infrastructure/
-            └── persistence/
-                ├── entity-repository.abstract.ts   # IEntityRepository interface
-                ├── memory-repository.abstract.ts   # IMemoryRepository interface
-                ├── log-repository.abstract.ts      # ILogRepository interface
-                │
-                ├── neo4j/
-                │   ├── entity.repository.ts        # entity resolution + all graph writes
-                │   └── memory.repository.ts        # graph reads (sentiments, facts, preferences, episodes, associations)
-                │
-                └── relational/
-                    ├── entities/                   # TypeORM entities (schema source of truth)
-                    │   ├── extraction-log.entity.ts
-                    │   ├── sentiment-log.entity.ts
-                    │   ├── fact-log.entity.ts
-                    │   └── preference-log.entity.ts
-                    └── repositories/
-                        └── log.repository.ts       # audit log writes + history reads
+└── libs/
+    └── shared/src/index.ts        shared TS types (ChatResponse, MemoryResponse, TickResult, ...)
 ```
 
 ---
@@ -462,6 +729,12 @@ Starts Neo4j and PostgreSQL automatically:
 ```bash
 cp .env.example .env   # fill in GEMINI_API_KEY, NEO4J_PASSWORD, POSTGRES_PASSWORD
 docker compose up -d
+```
+
+Then start the apps:
+```bash
+pnpm install
+pnpm dev         # runs api + web in parallel
 ```
 
 **Option B — local services**
@@ -490,12 +763,14 @@ DEFAULT_HALF_LIFE_DAYS=30
 HEBBIAN_DELTA=0.1
 ```
 
-Then start the server:
+Start individual apps:
 ```bash
-pnpm dev
+pnpm dev:api     # Fastify API only
+pnpm dev:web     # Next.js frontend only
+pnpm dev         # both in parallel
 ```
 
-**Run tests**
+**Run tests:**
 ```bash
 pnpm test
 ```
@@ -527,11 +802,14 @@ pnpm test
 | Concern | Library |
 |---|---|
 | Language | TypeScript (ESM) |
-| HTTP server | Fastify |
+| Monorepo | Nx + pnpm |
+| API server | Fastify 5 |
+| Frontend | Next.js 15 + React 19 |
+| Animations | Framer Motion |
+| Styling | Tailwind CSS 4 |
 | Graph database | Neo4j via `neo4j-driver` |
 | Relational database | PostgreSQL via TypeORM |
 | LLM | Gemini 2.0 Flash via `@google/genai` |
 | Schema validation | Zod |
 | Fuzzy matching | `fastest-levenshtein` |
-| Runtime | `tsx` |
 | Tests | Vitest |
